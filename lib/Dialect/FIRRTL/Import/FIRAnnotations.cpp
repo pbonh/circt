@@ -20,6 +20,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/JSON.h"
 
 namespace json = llvm::json;
@@ -844,6 +845,383 @@ static Optional<DictionaryAttr> parseAugmentedType(
           .attachNote()
       << "see annotation: " << augmentedType;
   return None;
+}
+
+/// Maybe reeturn an IntegerAttr representing the OMID encoded in an input str.
+/// This will convert "OMID:42" into Optional(42).
+static Optional<IntegerAttr> tryAsOMID(MLIRContext *ctx, StringAttr str) {
+  StringRef tpe, value;
+  std::tie(tpe, value) = str.getValue().split(":");
+  APInt idNumber;
+  auto isNotInteger = value.getAsInteger(10, idNumber);
+  if (tpe != "OMID" || isNotInteger) {
+    llvm::errs() << "expected OMID field did not conform to the expected "
+                    "format (\"OMID:<number>\"): "
+                 << str << "\n";
+    return None;
+  }
+  return IntegerAttr::get(IntegerType::get(ctx, 64), idNumber);
+}
+
+/// Recursively walk Object Model IR and generated scattered annotations.
+static Optional<Attribute>
+scatterOMIRIR(Attribute original, unsigned &annotationID,
+              llvm::StringMap<llvm::SmallVector<Attribute>> &newAnnotations,
+              CircuitOp circuit, size_t &nlaNumber) {
+
+  auto addID = [&](StringRef tpe) -> DictionaryAttr {
+    NamedAttrList fields;
+    auto *ctx = original.getContext();
+    fields.append("id",
+                  IntegerAttr::get(IntegerType::get(ctx, 64), annotationID++));
+    fields.append("tpe", StringAttr::get(ctx, tpe));
+    return DictionaryAttr::getWithSorted(ctx, fields);
+  };
+
+  auto *ctx = original.getContext();
+
+  return TypeSwitch<Attribute, Optional<Attribute>>(original)
+      .Case<ArrayAttr>([&](ArrayAttr arr) -> Optional<Attribute> {
+        SmallVector<Attribute> newArr;
+        for (auto element : arr) {
+          auto newElement = scatterOMIRIR(element, annotationID, newAnnotations,
+                                          circuit, nlaNumber);
+          if (!newElement)
+            return None;
+          newArr.push_back(newElement.getValue());
+        }
+        return ArrayAttr::get(ctx, newArr);
+      })
+      .Case<StringAttr>([&](StringAttr str) -> Optional<Attribute> {
+        // Test to see if this is a source locator.
+        StringRef tpe, value;
+        std::tie(tpe, value) = str.getValue().split(":");
+        if (tpe == "OMReferenceTarget" ||
+            tpe == "OMDontTouchedReferenceTarget" ||
+            tpe == "OMInstanceTarget" || tpe == "OMMemberTarget") {
+          NamedAttrList tracker;
+          tracker.append(
+              "id", IntegerAttr::get(IntegerType::get(ctx, 64), annotationID));
+          tracker.append("tpe", StringAttr::get(ctx, tpe));
+
+          auto canonTarget = canonicalizeTarget(value);
+          if (!canonTarget)
+            return None;
+          auto nlaTargets = expandNonLocal(*canonTarget);
+
+          auto leafTarget =
+              splitAndAppendTarget(tracker, std::get<0>(nlaTargets.back()), ctx)
+                  .first;
+
+          if (nlaTargets.size() > 1) {
+            buildNLA(circuit, ++nlaNumber, nlaTargets);
+            tracker.append("circt.nonlocal",
+                           FlatSymbolRefAttr::get(ctx, *canonTarget));
+          }
+
+          newAnnotations[leafTarget].push_back(
+              DictionaryAttr::get(ctx, tracker));
+
+          return addID(tpe);
+        }
+
+        if (tpe == "OMID") {
+          if (auto omid = tryAsOMID(ctx, str))
+            return omid.getValue();
+          return None;
+        }
+
+        if (tpe == "OMString") {
+          NamedAttrList newAnnotation;
+          newAnnotation.append("tpe", StringAttr::get(ctx, tpe));
+          newAnnotation.append("value", StringAttr::get(ctx, value));
+          return DictionaryAttr::get(ctx, newAnnotation);
+        }
+
+        // This is just a string and we can't say anything special about it.
+        return str;
+      })
+      .Case<DictionaryAttr>([&](DictionaryAttr dict) -> Optional<Attribute> {
+        NamedAttrList newAttrs;
+        for (auto pairs : dict) {
+          auto maybeValue = scatterOMIRIR(pairs.second, annotationID,
+                                          newAnnotations, circuit, nlaNumber);
+          if (!maybeValue)
+            return None;
+          newAttrs.append(pairs.first, maybeValue.getValue());
+        }
+        return DictionaryAttr::get(ctx, newAttrs);
+      })
+      .Case<BoolAttr, FloatAttr, IntegerAttr, mlir::LocationAttr,
+            mlir::UnitAttr>([](auto passThrough) { return passThrough; })
+      .Default([&](auto) -> Optional<Attribute> {
+        llvm::errs() << "unexpected or unhandled value in OMIR: " << original
+                     << "\n";
+        return None;
+      });
+}
+
+/// Fields is optional and is a dictionary encoded as an array of objects:
+///   - "info": String
+///   - "name": String
+///   - "value": JSON
+/// The dictionary is keyed by the "name" member and the array of fields is
+/// guaranteed to not have collisions of the "name" key.
+static Optional<std::pair<StringRef, Attribute>>
+scatterOMField(Attribute original, const Attribute root, unsigned &annotationID,
+               llvm::StringMap<llvm::SmallVector<Attribute>> &newAnnotations,
+               CircuitOp circuit, size_t &nlaNumber, Location loc) {
+  DictionaryAttr dict = original.dyn_cast<DictionaryAttr>();
+  if (!dict) {
+    llvm::errs() << "OMField is not a dictionary, but should be: " << original
+                 << "\n";
+    return None;
+  }
+
+  auto *ctx = circuit.getContext();
+
+  // Generate an arbitrary identifier to use for caching when using
+  // `maybeStringToLocation`.
+  Identifier locatorFilenameCache = Identifier::get(".", ctx);
+  FileLineColLoc fileLineColLocCache;
+
+  // Convert location from a string to a location attribute.
+  auto infoAttr =
+      tryGetAs<StringAttr>(dict, root, "info", loc, omirAnnotationClass);
+  if (!infoAttr)
+    return None;
+  auto maybeLoc =
+      maybeStringToLocation(infoAttr.getValue(), false, locatorFilenameCache,
+                            fileLineColLocCache, ctx);
+  if (!maybeLoc.first)
+    return None;
+
+  // Extract the name attribute.
+  auto nameAttr =
+      tryGetAs<StringAttr>(dict, root, "name", loc, omirAnnotationClass);
+  if (!nameAttr)
+    return None;
+
+  // The value attribute is unstructured and just copied over.
+  auto valueAttr = dict.get("value");
+  if (!valueAttr) {
+    llvm::errs() << "OMField missing \"value\" field: " << original << "\n";
+    return None;
+  }
+  auto newValue = scatterOMIRIR(valueAttr, annotationID, newAnnotations,
+                                circuit, nlaNumber);
+  if (!newValue)
+    return None;
+
+  NamedAttrList values;
+  values.append("info", maybeLoc.second.getValue());
+  values.append("value", newValue.getValue());
+
+  return {{nameAttr.getValue(), DictionaryAttr::getWithSorted(ctx, values)}};
+}
+
+/// An OMNode should look like the following:
+///   - "info": String
+///   - "id": String that starts with "OMID:"
+///   - "fields": Array<Object>
+static Optional<Attribute>
+scatterOMNode(Attribute original, const Attribute root, unsigned &annotationID,
+              llvm::StringMap<llvm::SmallVector<Attribute>> &newAnnotations,
+              CircuitOp circuit, size_t &nlaNumber, Location loc) {
+  DictionaryAttr dict = original.dyn_cast<DictionaryAttr>();
+  if (!dict) {
+    llvm::errs() << "OMNode is not a dictionary, but should be: " << original
+                 << "\n";
+    return None;
+  }
+
+  // Manually build up OMNode.
+  NamedAttrList omnode;
+  auto *ctx = circuit.getContext();
+
+  Identifier locatorFilenameCache = Identifier::get(".", ctx);
+  FileLineColLoc fileLineColLocCache;
+
+  // Convert the location from a string to a location attribute.
+  auto infoAttr =
+      tryGetAs<StringAttr>(dict, root, "info", loc, omirAnnotationClass);
+  if (!infoAttr)
+    return None;
+  auto maybeLoc =
+      maybeStringToLocation(infoAttr.getValue(), false, locatorFilenameCache,
+                            fileLineColLocCache, ctx);
+  if (!maybeLoc.first)
+    return None;
+
+  // Store the location attribute.
+  auto idAttr =
+      tryGetAs<StringAttr>(dict, root, "id", loc, omirAnnotationClass);
+  if (!idAttr)
+    return None;
+  auto id = tryAsOMID(ctx, idAttr);
+  if (!id)
+    return None;
+
+  // Convert the fields from an ArrayAttr to a DictionaryAttr keyed by their
+  // "name".  If no fields member exists, then just create an empty dictionary.
+  auto maybeFields = dict.getAs<ArrayAttr>("fields");
+  DictionaryAttr fields;
+  if (!maybeFields)
+    fields = DictionaryAttr::get(ctx);
+  else {
+    auto fieldAttr = maybeFields.getValue();
+    NamedAttrList fieldAttrs;
+    for (auto field : fieldAttr) {
+      if (auto newField =
+              scatterOMField(field, root, annotationID, newAnnotations, circuit,
+                             nlaNumber, loc)) {
+        fieldAttrs.append(newField.getValue().first,
+                          newField.getValue().second);
+        continue;
+      }
+      return None;
+    }
+    fields = DictionaryAttr::get(ctx, fieldAttrs);
+  }
+
+  omnode.append("fields", fields);
+  omnode.append("id", id.getValue());
+  omnode.append("info", maybeLoc.second.getValue());
+
+  return DictionaryAttr::getWithSorted(ctx, omnode);
+}
+
+static Optional<Attribute> scatterOMIRAnnotation(
+    DictionaryAttr dict, unsigned &annotationID,
+    llvm::StringMap<llvm::SmallVector<Attribute>> &newAnnotations,
+    CircuitOp circuit, size_t &nlaNumber, Location loc) {
+
+  auto nodes =
+      tryGetAs<ArrayAttr>(dict, dict, "nodes", loc, omirAnnotationClass);
+  if (!nodes)
+    return None;
+
+  SmallVector<Attribute> newNodes;
+  for (auto node : nodes) {
+    auto newNode = scatterOMNode(node, dict, annotationID, newAnnotations,
+                                 circuit, nlaNumber, loc);
+    if (!newNode)
+      return None;
+    newNodes.push_back(newNode.getValue());
+  }
+
+  auto *ctx = circuit.getContext();
+
+  NamedAttrList newAnnotation;
+  newAnnotation.append("class", StringAttr::get(ctx, omirAnnotationClass));
+  newAnnotation.append("nodes", ArrayAttr::get(ctx, newNodes));
+  return DictionaryAttr::get(ctx, newAnnotation);
+}
+
+static Optional<Attribute>
+scatterOMIR(Attribute original, unsigned &annotationID,
+            llvm::StringMap<llvm::SmallVector<Attribute>> &newAnnotations,
+            CircuitOp circuit, size_t &nlaNumber) {
+
+  auto addID = [&](StringRef tpe) -> DictionaryAttr {
+    NamedAttrList fields;
+    auto *ctx = original.getContext();
+    fields.append("id",
+                  IntegerAttr::get(IntegerType::get(ctx, 64), annotationID++));
+    fields.append("tpe", StringAttr::get(ctx, tpe));
+    return DictionaryAttr::getWithSorted(ctx, fields);
+  };
+
+  auto unhandled = [&]() -> Optional<Attribute> {
+    llvm::errs() << "unexpected or unhandled value in OMIR: " << original
+                 << "\n";
+    return None;
+  };
+
+  auto *ctx = original.getContext();
+
+  // Generate an arbitrary identifier to use for caching when using
+  // `maybeStringToLocation`.
+  Identifier locatorFilenameCache = Identifier::get(".", ctx);
+  FileLineColLoc fileLineColLocCache;
+
+  return TypeSwitch<Attribute, Optional<Attribute>>(original)
+      .Case<ArrayAttr>([&](ArrayAttr arr) -> Optional<Attribute> {
+        SmallVector<Attribute> newArr;
+        for (auto element : arr) {
+          auto newElement = scatterOMIR(element, annotationID, newAnnotations,
+                                        circuit, nlaNumber);
+          if (!newElement)
+            return None;
+          newArr.push_back(newElement.getValue());
+        }
+        return ArrayAttr::get(ctx, newArr);
+      })
+      .Case<StringAttr>([&](StringAttr str) -> Optional<Attribute> {
+        // Test to see if this is a source locator.
+        auto maybeLoc =
+            maybeStringToLocation(str.getValue(), false, locatorFilenameCache,
+                                  fileLineColLocCache, ctx);
+        if (maybeLoc.first)
+          return maybeLoc.second.getValue();
+
+        StringRef tpe, value;
+        std::tie(tpe, value) = str.getValue().split(":");
+        if (tpe == "OMReferenceTarget" ||
+            tpe == "OMDontTouchedReferenceTarget" ||
+            tpe == "OMInstanceTarget" || tpe == "OMMemberTarget") {
+          NamedAttrList tracker;
+          tracker.append(
+              "id", IntegerAttr::get(IntegerType::get(ctx, 64), annotationID));
+          tracker.append("tpe", StringAttr::get(ctx, tpe));
+
+          auto canonTarget = canonicalizeTarget(value);
+          if (!canonTarget)
+            return None;
+          auto nlaTargets = expandNonLocal(*canonTarget);
+
+          auto leafTarget =
+              splitAndAppendTarget(tracker, std::get<0>(nlaTargets.back()), ctx)
+                  .first;
+
+          // TODO: Handle NLA targets.
+          assert(nlaTargets.size() <= 1);
+          if (nlaTargets.size() > 1) {
+            buildNLA(circuit, ++nlaNumber, nlaTargets);
+            tracker.append("circt.nonlocal",
+                           FlatSymbolRefAttr::get(ctx, *canonTarget));
+          }
+
+          newAnnotations[leafTarget].push_back(
+              DictionaryAttr::get(ctx, tracker));
+
+          return addID(tpe);
+        }
+
+        if (tpe == "OMString" || tpe == "OMID") {
+          NamedAttrList newAnnotation;
+          newAnnotation.append("tpe", StringAttr::get(ctx, tpe));
+          newAnnotation.append("value", StringAttr::get(ctx, value));
+          return DictionaryAttr::get(ctx, newAnnotation);
+        }
+
+        // This is just a string.
+        return str;
+      })
+      .Case<mlir::LocationAttr, IntegerAttr>(
+          [](auto passThrough) { return passThrough; })
+      .Case<DictionaryAttr>([&](DictionaryAttr dict) -> Optional<Attribute> {
+        NamedAttrList newAttrs;
+        for (auto pairs : dict) {
+          auto maybeValue = scatterOMIR(pairs.second, annotationID,
+                                        newAnnotations, circuit, nlaNumber);
+          if (!maybeValue)
+            return None;
+          newAttrs.append(pairs.first, maybeValue.getValue());
+        }
+        return DictionaryAttr::get(ctx, newAttrs);
+      })
+      .Default([&](auto) -> Optional<Attribute> { return unhandled(); });
 }
 
 /// Convert known custom FIRRTL Annotations with compound targets to multiple
