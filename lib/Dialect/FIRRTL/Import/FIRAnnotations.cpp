@@ -1696,6 +1696,16 @@ bool circt::firrtl::scatterCustomAnnotations(
       continue;
     }
 
+    // Scatter trackers out from OMIR JSON.
+    if (clazz == omirAnnotationClass) {
+      auto newAnno = scatterOMIRAnnotation(dict, annotationID, newAnnotations,
+                                           circuit, nlaNumber, loc);
+      if (!newAnno)
+        return false;
+      newAnnotations["~"].push_back(newAnno.getValue());
+      continue;
+    }
+
     // Just copy over any annotation we don't understand.
     newAnnotations["~"].push_back(a);
   }
