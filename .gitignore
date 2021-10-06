@@ -2,7 +2,8 @@
 /install*
 /docker_build
 tags
-.vscode
+.vscode/*
+!.vscode/CIRCT.code-workspace
 compile_commands.json
 .cache/
 #*
@@ -18,3 +19,4 @@ lit.site.cfg.py
 
 # External software
 /ext
+

@@ -1,0 +1,81 @@
+{
+  /**
+  This file defines an example VSCode workspace for working with both Circt and MLIR.
+  We are not committed to keeping it up-to-date, but we believe it is valueable as a starting point for folks interested in using VSCode as their IDE.
+  */
+  "folders": [
+    {
+      "name": "CIRCT",
+      "path": ".."
+    },
+    {
+      "name": "MLIR",
+      "path": "../llvm/mlir"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "llvm": true
+    },
+
+    "editor.detectIndentation": false,
+    "editor.insertSpaces": true,
+    "editor.useTabStops": true,
+    "editor.tabSize": 2,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "xaver.clang-format",
+
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.autocomplete": "Disabled",
+    "C_Cpp.enhancedColorization": "Disabled",
+    "C_Cpp.errorSquiggles": "Disabled",
+    "C_Cpp.formatting": "Disabled",
+    "C_Cpp.intelliSenseEngine": "Disabled",
+    "cmake.sourceDirectory": "${workspaceFolder:CIRCT}/llvm/llvm",
+    "cmake.buildDirectory": "${workspaceFolder:CIRCT}/build/vscode",
+    "cmake.copyCompileCommands": "${workspaceFolder:CIRCT}/compile_commands.json",
+    "cmake.preferredGenerators": [
+        "Ninja",
+        "Unix Makefiles"
+    ],
+    "cmake.configureSettings": {
+        "LLVM_DIR": "${workspaceFolder:CIRCT}/llvm/llvm",
+        "MLIR_DIR": "${workspaceFolder:CIRCT}/llvm/mlir",
+        "LLVM_ENABLE_PROJECTS": "mlir",
+        "LLVM_TARGETS_TO_BUILD": "X86;RISCV",
+        "LLVM_TARGETS_TO_BUILD": "host",
+        "LLVM_ENABLE_ASSERTIONS": "ON",
+        "LLVM_ENABLE_DOXYGEN": "OFF",
+        "MLIR_INCLUDE_INTEGRATION_TESTS": "ON",
+        "LLVM_BUILD_EXAMPLES": "OFF",
+        "LLVM_ENABLE_OCAMLDOC": "OFF",
+        "LLVM_ENABLE_BINDINGS": "OFF",
+        "LLVM_BUILD_TOOLS": "ON",
+        "LLVM_OPTIMIZED_TABLEGEN": "ON",
+        "LLVM_INCLUDE_TOOLS": "ON",
+        "LLVM_USE_SPLIT_DWARF": "ON",
+        "LLVM_BUILD_LLVM_DYLIB": "ON",
+        "LLVM_LINK_LLVM_DYLIB": "ON",
+        // "LLVM_CCACHE_BUILD": "ON",
+        // "LLVM_ENABLE_LLD": "ON",
+        "LLVM_EXTERNAL_PROJECTS": "circt",
+        "LLVM_EXTERNAL_CIRCT_SOURCE_DIR": "${workspaceFolder:CIRCT}"
+    },
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder:CIRCT}",
+        "--background-index",
+        "--pch-storage=memory",
+        "--limit-results=0",
+        "--j=8",
+        "--all-scopes-completion"
+    ]
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.cpptools",
+      "llvm-vs-code-extensions.vscode-clangd",
+      "xaver.clang-format",
+      "ms-vscode.cmake-tools"
+    ]
+  }
+}
