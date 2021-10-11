@@ -109,7 +109,7 @@ static cl::opt<bool> disableAnnotationsUnknown(
 static cl::opt<bool>
     emitMetadata("emit-metadata",
                  cl::desc("emit metadata for metadata annotations"),
-                 cl::init(true));
+                 cl::init(false));
 
 static cl::opt<bool> imconstprop(
     "imconstprop",
@@ -301,9 +301,6 @@ processBuffer(MLIRContext &context, TimingScope &ts, llvm::SourceMgr &sourceMgr,
     pm.nest<firrtl::CircuitOp>().addPass(
         firrtl::createLowerFIRRTLAnnotationsPass(disableAnnotationsUnknown,
                                                  disableAnnotationsClassless));
-  if (emitMetadata)
-    pm.nest<firrtl::CircuitOp>().addPass(
-        firrtl::createCreateSiFiveMetadataPass());
 
   if (!disableOptimization) {
     pm.nest<firrtl::CircuitOp>().nest<firrtl::FModuleOp>().addPass(
@@ -375,6 +372,10 @@ processBuffer(MLIRContext &context, TimingScope &ts, llvm::SourceMgr &sourceMgr,
   if (!disableOptimization)
     pm.nest<firrtl::CircuitOp>().nest<firrtl::FModuleOp>().addPass(
         createSimpleCanonicalizerPass());
+
+  if (emitMetadata)
+    pm.nest<firrtl::CircuitOp>().addPass(
+        firrtl::createCreateSiFiveMetadataPass());
 
   // Lower if we are going to verilog or if lowering was specifically requested.
   if (lowerToHW || outputFormat == OutputVerilog ||

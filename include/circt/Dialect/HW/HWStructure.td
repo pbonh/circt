@@ -60,6 +60,16 @@ def HWModuleOp : HWOp<"module",
       return getAllModulePortInfos(*this);
     }
 
+    /// Return the PortInfo for the specified input or inout port.
+    PortInfo getInOrInoutPort(size_t i) {
+      return getModuleInOrInoutPort(*this, i);
+    }
+
+    /// Return the PortInfo for the specified output port.
+    PortInfo getOutputPort(size_t i) {
+      return getModuleOutputPort(*this, i);
+    }
+
     // TODO(mlir): FunctionLike shouldn't produce a getBody() helper, it is
     // squatting on the name.
     Block *getBodyBlock() { return &body().front(); }
@@ -142,6 +152,16 @@ def HWModuleExternOp : HWOp<"module.extern",
     /// Return all the module ports merged into one list.
     SmallVector<PortInfo> getAllPorts() {
       return getAllModulePortInfos(*this);
+    }
+
+    /// Return the PortInfo for the specified input or inout port.
+    PortInfo getInOrInoutPort(size_t i) {
+      return getModuleInOrInoutPort(*this, i);
+    }
+
+    /// Return the PortInfo for the specified output port.
+    PortInfo getOutputPort(size_t i) {
+      return getModuleOutputPort(*this, i);
     }
 
     /// Return the name to use for the Verilog module that we're referencing
@@ -359,12 +379,12 @@ def InstanceOp : HWOp<"instance", [Symbol,
 
     /// Change the names of all the input ports.
     void setArgumentNames(ArrayAttr names) {
-      getOperation()->setAttr("argNames", names);
+      argNamesAttr(names);
     }
 
     /// Change the names of all the result ports.
     void setResultNames(ArrayAttr names) {
-      getOperation()->setAttr("resultNames", names);
+      resultNamesAttr(names);
     }
 
     /// Lookup the module or extmodule for the symbol.  This returns null on
@@ -373,12 +393,12 @@ def InstanceOp : HWOp<"instance", [Symbol,
 
     /// Get the instances's name.
     StringAttr getName() {
-      return (*this)->getAttrOfType<StringAttr>("instanceName");
+      return instanceNameAttr();
     }
 
     /// Set the instance's name.
     void setName(StringAttr name) {
-      (*this)->setAttr("instanceName", name);
+      instanceNameAttr(name);
     }
 
     LogicalResult verifyCustom();

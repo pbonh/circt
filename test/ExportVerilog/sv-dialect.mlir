@@ -815,11 +815,11 @@ hw.module @verbatim_M1(%clock : i1, %cond : i1, %val : i8) {
   %c42_2 = hw.constant 42 : i8
   %xor = comb.xor %val, %c42_2 : i8
   hw.instance "aa1" sym @verbatim_b1 @verbatim_inout_2() ->()
-  // CHECK: MACRO(val + 8'h2A, val ^ 8'h2A reg=reg1, verbatim_M2, verbatim_inout_2, verbatim_schema~aa1,reg2 = reg2 )
-  sv.verbatim  "MACRO({{0}}, {{1}} reg={{2}}, {{3}}, {{4}}, {{5}}~{{6}},reg2 = {{7}} )" 
+  // CHECK: MACRO(val + 8'h2A, val ^ 8'h2A reg=reg1, verbatim_M2, verbatim_inout_2, aa1,reg2 = reg2 )
+  sv.verbatim  "MACRO({{0}}, {{1}} reg={{2}}, {{3}}, {{4}}, {{5}},reg2 = {{6}} )" 
           (%add, %xor)  : i8,i8
           {symbols = [@verbatim_reg1, @verbatim_M2, 
-          @verbatim_inout_2, @verbatim_schema, @verbatim_b1, @verbatim_reg2]}
+          @verbatim_inout_2, @verbatim_b1, @verbatim_reg2]}
   // CHECK: Wire : wire25
   sv.verbatim " Wire : {{0}}" {symbols = [@verbatim_wireSym1]}
 }
@@ -936,6 +936,16 @@ hw.module @InlineAutomaticLogicInit(%a : i42, %b: i42, %really_really_long_port:
   }
 }
 
+//CHECK-LABEL: module XMR_src
+//CHECK: assign $root.a.b.c = a;
+//CHECK-NEXT: assign aa = d.e.f;
+hw.module @XMR_src(%a : i23) -> (aa: i3) {
+  %xmr1 = sv.xmr isRooted a,b,c : !hw.inout<i23>
+  %xmr2 = sv.xmr "d",e,f : !hw.inout<i3>
+  %r = sv.read_inout %xmr2 : !hw.inout<i3>
+  sv.assign %xmr1, %a : i23
+  hw.output %r : i3
+}
 
 // CHECK-LABEL: module extInst
 hw.module.extern @extInst(%_h: i1, %_i: i1, %_j: i1, %_k: i1, %_z :i0) -> ()

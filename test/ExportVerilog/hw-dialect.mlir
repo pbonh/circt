@@ -901,11 +901,3 @@ hw.module @VerilogCompatParameters<p1: i42, p2: i32, p3: f64 = 1.5,
   // CHECK-NEXT:   parameter             p5 = "foo")
 
 }
-
-// CHECK: module namechange(
-// CHECK: input  [3:0] casex_0,
-// CHECK: output [3:0] if_1); 
-hw.module @namechange(%casex: i4) -> (if: i4) {
-  // CHECK: assign if_1 = casex_0;
-  hw.output %casex : i4
-}
