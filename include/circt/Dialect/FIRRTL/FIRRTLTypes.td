@@ -280,3 +280,12 @@ def AugmentedLiteralType : AugmentedType<"AugmentedLiteralType"> {
 def AugmentedDeletedType : AugmentedType<"AugmentedDeletedType"> {
   let extraClassDeclaration = hasName;
 }
+
+def SynthAnnotationAttr : AttrDef<FIRRTLDialect, "SynthAnnotation"> {
+  let summary = "An Annotation of Values Necessary for Logic/Physical Synthesis";
+  let description = [{
+    An Annotation of Values Necessary for Logic/Physical Synthesis.
+  }];
+  let mnemonic = "synthAnno";
+  let parameters = (ins "int64_t":$xCoord, "int64_t":$yCoord, "DictionaryAttr":$annotations);
+}

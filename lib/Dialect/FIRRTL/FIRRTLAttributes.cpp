@@ -112,3 +112,34 @@ void FIRRTLDialect::registerAttributes() {
 #include "circt/Dialect/FIRRTL/FIRRTLAttributes.cpp.inc"
       >();
 }
+//
+//===----------------------------------------------------------------------===//
+// SynthAnnotationAttr
+//===----------------------------------------------------------------------===//
+
+Attribute SynthAnnotationAttr::parse(DialectAsmParser &p, Type type) {
+  int64_t xCoord;
+  int64_t yCoord;
+  DictionaryAttr annotations;
+  StringRef xCoordKeyword;
+  StringRef yCoordKeyword;
+
+  if (p.parseLess() || p.parseKeyword(&xCoordKeyword) || p.parseEqual() ||
+      p.parseInteger(xCoord) || p.parseComma() ||
+      p.parseKeyword(&yCoordKeyword) || p.parseEqual() ||
+      p.parseInteger(yCoord) || p.parseComma() ||
+      p.parseAttribute<DictionaryAttr>(annotations) || p.parseGreater())
+    return Attribute();
+
+  if ((xCoordKeyword != "xCoord") || (yCoordKeyword != "yCoord"))
+    return Attribute();
+
+  return SynthAnnotationAttr::get(p.getContext(), xCoord, yCoord, annotations);
+}
+
+void SynthAnnotationAttr::print(DialectAsmPrinter &p) const {
+  p << getMnemonic() << "<xCoord = " << getXCoord() << ", "
+    << getMnemonic() << "<yCoord = " << getYCoord() << ", "
+    << getAnnotations() << ">";
+}
+
