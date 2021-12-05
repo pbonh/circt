@@ -117,29 +117,69 @@ void FIRRTLDialect::registerAttributes() {
 // SynthAnnotationAttr
 //===----------------------------------------------------------------------===//
 
-Attribute SynthAnnotationAttr::parse(DialectAsmParser &p, Type type) {
+Attribute SynthRectangleEdgeAnnotationAttr::parse(DialectAsmParser &p, Type type) {
   int64_t xCoord;
   int64_t yCoord;
-  DictionaryAttr annotations;
+  RectEdgeEnum xCoordRectEdge;
+  RectEdgeEnum yCoordRectEdge;
+  int8_t xCoordRectEdgeInt;
+  int8_t yCoordRectEdgeInt;
+  int64_t xCoordCost;
+  int64_t yCoordCost;
+  bool isDivisor;
   StringRef xCoordKeyword;
   StringRef yCoordKeyword;
+  StringRef xCoordRectEdgeKeyword;
+  StringRef yCoordRectEdgeKeyword;
+  StringRef xCoordCostKeyword;
+  StringRef yCoordCostKeyword;
+  StringRef isDivisorKeyword;
 
-  if (p.parseLess() || p.parseKeyword(&xCoordKeyword) || p.parseEqual() ||
+  if (p.parseLess() ||
+      p.parseKeyword(&xCoordKeyword) || p.parseEqual() ||
       p.parseInteger(xCoord) || p.parseComma() ||
       p.parseKeyword(&yCoordKeyword) || p.parseEqual() ||
       p.parseInteger(yCoord) || p.parseComma() ||
-      p.parseAttribute<DictionaryAttr>(annotations) || p.parseGreater())
+      p.parseKeyword(&xCoordRectEdgeKeyword) || p.parseEqual() ||
+      p.parseInteger(xCoordRectEdgeInt) || p.parseComma() ||
+      p.parseKeyword(&yCoordRectEdgeKeyword) || p.parseEqual() ||
+      p.parseInteger(yCoordRectEdgeInt) || p.parseComma() ||
+      p.parseKeyword(&xCoordCostKeyword) || p.parseEqual() ||
+      p.parseInteger(xCoordCost) || p.parseComma() ||
+      p.parseKeyword(&yCoordCostKeyword) || p.parseEqual() ||
+      p.parseInteger(yCoordCost) || p.parseComma() ||
+      p.parseKeyword(&isDivisorKeyword) || p.parseEqual() ||
+      p.parseInteger(isDivisor) ||
+      p.parseGreater())
     return Attribute();
 
-  if ((xCoordKeyword != "xCoord") || (yCoordKeyword != "yCoord"))
+  if ((xCoordKeyword != "xCoord") ||
+      (yCoordKeyword != "yCoord") ||
+      (xCoordRectEdgeKeyword != "xCoordRectEdge") ||
+      (yCoordRectEdgeKeyword != "yCoordRectEdge") ||
+      (xCoordCostKeyword != "xCoordCost") ||
+      (yCoordCostKeyword != "yCoordCost") ||
+      (isDivisorKeyword != "isDivisor"))
     return Attribute();
 
-  return SynthAnnotationAttr::get(p.getContext(), xCoord, yCoord, annotations);
+  xCoordRectEdge = RectEdgeEnum(xCoordRectEdgeInt);
+  yCoordRectEdge = RectEdgeEnum(yCoordRectEdgeInt);
+  return SynthRectangleEdgeAnnotationAttr::get(p.getContext(),
+      xCoord, yCoord,
+      xCoordRectEdge, yCoordRectEdge,
+      xCoordCost, yCoordCost,
+      isDivisor
+  );
 }
 
-void SynthAnnotationAttr::print(DialectAsmPrinter &p) const {
+void SynthRectangleEdgeAnnotationAttr::print(DialectAsmPrinter &p) const {
   p << getMnemonic() << "<xCoord = " << getXCoord() << ", "
     << getMnemonic() << "<yCoord = " << getYCoord() << ", "
-    << getAnnotations() << ">";
+    << getMnemonic() << "<xCoordRectEdge = " << static_cast< typename std::underlying_type<RectEdgeEnum>::type >(getXCoordRectEdge()) << ", "
+    << getMnemonic() << "<yCoordRectEdge = " << static_cast< typename std::underlying_type<RectEdgeEnum>::type >(getYCoordRectEdge()) << ", "
+    << getMnemonic() << "<xCoordCost = " << getXCoordCost() << ", "
+    << getMnemonic() << "<yCoordCost = " << getYCoordCost() << ", "
+    << getMnemonic() << "<isDivisor = " << getIsDivisor() << ", "
+    << ">";
 }
 

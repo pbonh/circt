@@ -281,11 +281,23 @@ def AugmentedDeletedType : AugmentedType<"AugmentedDeletedType"> {
   let extraClassDeclaration = hasName;
 }
 
-def SynthAnnotationAttr : AttrDef<FIRRTLDialect, "SynthAnnotation"> {
-  let summary = "An Annotation of Values Necessary for Logic/Physical Synthesis";
+def REE_Uninitialized: I32EnumAttrCase<"UninitializedEdge", 0>;
+def REE_Bottom: I32EnumAttrCase<"BottomEdge", 1>;
+def REE_Top: I32EnumAttrCase<"TopEdge", 2>;
+
+def RectEdgeEnum: I32EnumAttr<"RectEdgeEnum", "Rectangle Edge Top or Bottom",
+                         [REE_Uninitialized, REE_Bottom, REE_Top]>;
+
+def SynthRectangleEdgeAnnotationAttr : AttrDef<FIRRTLDialect, "SynthRectangleEdgeAnnotation"> {
+  let summary = "Rectangle edge coordinates for firrtl wires.";
   let description = [{
-    An Annotation of Values Necessary for Logic/Physical Synthesis.
+    Rectangle edge coordinates for firrtl wires representing the shrunken bounding boxes used for incremental placement.
   }];
-  let mnemonic = "synthAnno";
-  let parameters = (ins "int64_t":$xCoord, "int64_t":$yCoord, "DictionaryAttr":$annotations);
+  let mnemonic = "synthRectEdgeAnno";
+  let parameters = (
+      ins "int64_t":$xCoord, "int64_t":$yCoord,
+      "RectEdgeEnum":$xCoordRectEdge, "RectEdgeEnum":$yCoordRectEdge,
+      "int64_t":$xCoordCost, "int64_t":$yCoordCost,
+      "bool":$isDivisor
+  );
 }
