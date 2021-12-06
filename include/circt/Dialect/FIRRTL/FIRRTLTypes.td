@@ -281,6 +281,17 @@ def AugmentedDeletedType : AugmentedType<"AugmentedDeletedType"> {
   let extraClassDeclaration = hasName;
 }
 
+def RectCorner : TypeParameter<"std::pair<int64_t, int64_t>", "Rectangle Corner Coordinates"> {
+  let printer = [{ $_printer << $_self.first << " * " << $_self.second }];
+  let parser = [{ [&] -> FailureOr<std::pair<int64_t, int64_t>> {
+    int64_t xCoord, yCoord;
+    if ($_parser.parseInteger(xCoord) || $_parser.parseStar() ||
+        $_parser.parseInteger(yCoord))
+      return failure();
+    return std::make_pair(xCoord, yCoord);
+  }() }];
+}
+
 def REE_Uninitialized: I32EnumAttrCase<"UninitializedEdge", 0>;
 def REE_Bottom: I32EnumAttrCase<"BottomEdge", 1>;
 def REE_Top: I32EnumAttrCase<"TopEdge", 2>;
