@@ -74,6 +74,30 @@ void SubAnnotationAttr::print(AsmPrinter &p) const {
 }
 
 //===----------------------------------------------------------------------===//
+// SynthAnnotationAttr
+//===----------------------------------------------------------------------===//
+
+Attribute SynthAnnotationAttr::parse(AsmParser &p, Type type) {
+  int64_t synthID;
+  DictionaryAttr annotations;
+  StringRef synthIDKeyword;
+
+  if (p.parseLess() || p.parseKeyword(&synthIDKeyword) || p.parseEqual() ||
+      p.parseInteger(synthID) || p.parseComma() ||
+      p.parseAttribute<DictionaryAttr>(annotations) || p.parseGreater())
+    return Attribute();
+
+  if (synthIDKeyword != "synthID")
+    return Attribute();
+
+  return SynthAnnotationAttr::get(p.getContext(), synthID, annotations);
+}
+
+void SynthAnnotationAttr::print(AsmPrinter &p) const {
+  p << "<synthID = " << getSynthID() << ", " << getAnnotations() << ">";
+}
+
+//===----------------------------------------------------------------------===//
 // Utilities related to Direction
 //===----------------------------------------------------------------------===//
 

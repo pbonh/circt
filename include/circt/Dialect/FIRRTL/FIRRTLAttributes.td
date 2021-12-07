@@ -141,4 +141,13 @@ def AugmentedDeletedType : AugmentedType<"AugmentedDeletedType"> {
   let extraClassDeclaration = hasName;
 }
 
+def SynthAnnotationAttr : AttrDef<FIRRTLDialect, "SynthAnnotation"> {
+  let summary = "An Annotation to link FIRRTL netlists to synthesis flows";
+  let description = [{
+    An Annotation to link FIRRTL netlists to synthesis flow.
+  }];
+  let mnemonic = "synthAnno";
+  let parameters = (ins "int64_t":$synthID, "DictionaryAttr":$annotations);
+}
+
 #endif // CIRCT_DIALECT_FIRRTL_FIRRTLATTRIBUTES_TD
