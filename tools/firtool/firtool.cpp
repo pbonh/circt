@@ -198,6 +198,9 @@ static cl::opt<bool>
 static cl::opt<bool> newAnno("new-anno",
                              cl::desc("enable new annotation handling"),
                              cl::init(false));
+static cl::opt<bool> synthAnno("synth-anno",
+                             cl::desc("enable synth annotation handling"),
+                             cl::init(false));
 
 enum OutputFormatKind {
   OutputMLIR,
@@ -292,6 +295,7 @@ processBuffer(MLIRContext &context, TimingScope &ts, llvm::SourceMgr &sourceMgr,
     firrtl::FIRParserOptions options;
     options.ignoreInfoLocators = ignoreFIRLocations;
     options.rawAnnotations = newAnno;
+    options.synthAnnotations = synthAnno;
     options.numAnnotationFiles = numAnnotationFiles;
     module = importFIRFile(sourceMgr, &context, options);
   } else {
@@ -331,6 +335,11 @@ processBuffer(MLIRContext &context, TimingScope &ts, llvm::SourceMgr &sourceMgr,
   if (newAnno)
     pm.nest<firrtl::CircuitOp>().addPass(
         firrtl::createLowerFIRRTLAnnotationsPass(disableAnnotationsUnknown,
+                                                 disableAnnotationsClassless));
+
+  if (synthAnno)
+    pm.nest<firrtl::CircuitOp>().addPass(
+        firrtl::createSynthFIRRTLAnnotationsPass(disableAnnotationsUnknown,
                                                  disableAnnotationsClassless));
 
   if (!disableOptimization) {

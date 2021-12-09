@@ -10,6 +10,7 @@ target_link_libraries(firtool PRIVATE
   CIRCTExportVerilog
   CIRCTImportFIRFile
   CIRCTFIRRTLToHW
+  CIRCTSynthFIRRTL
   CIRCTFIRRTLTransforms
   CIRCTSVTransforms
 

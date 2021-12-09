@@ -38,6 +38,9 @@ struct FIRParserOptions {
   /// This, along with numOMIRFiles provides structure to the buffers in the
   /// source manager.
   unsigned numAnnotationFiles;
+  /// If this is set to true, the annotations are intended for use in the synthesis
+  /// flows.
+  bool synthAnnotations = false;
 };
 
 mlir::OwningModuleRef importFIRFile(llvm::SourceMgr &sourceMgr,

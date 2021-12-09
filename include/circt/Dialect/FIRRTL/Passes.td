@@ -50,6 +50,20 @@ def LowerFIRRTLTypes : Pass<"firrtl-lower-types", "firrtl::CircuitOp"> {
   ];
 }
 
+def SynthFIRRTLAnnotations : Pass<"firrtl-synth-annotations", "firrtl::CircuitOp"> {
+  let summary = "Synthesize FIRRTL modules";
+  let description = [{
+    Add FIRRTL annotations to enable synthesis of FIRRTL module.
+  }];
+  let constructor = "circt::firrtl::createSynthFIRRTLAnnotationsPass()";
+  let options = [
+    Option<"ignoreAnnotationClassless", "disable-annotation-classless", "bool", "false",
+      "Ignore classless annotations.">,
+    Option<"ignoreAnnotationUnknown", "disable-annotation-unknown", "bool", "true",
+      "Ignore unknown annotations.">
+  ];
+}
+
 def IMConstProp : Pass<"firrtl-imconstprop", "firrtl::CircuitOp"> {
   let summary = "Intermodule constant propagation and dead code elimination";
   let description = [{

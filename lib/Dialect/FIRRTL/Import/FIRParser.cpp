@@ -2606,6 +2606,8 @@ ParseResult FIRStmtParser::parseInstance() {
   InstanceOp result;
   if (getConstants().options.rawAnnotations) {
     result = builder.create<InstanceOp>(referencedModule, id);
+  } else if (getConstants().options.synthAnnotations) {
+      // getSynthAnnotations
   } else {
     // Combine annotations that are ReferenceTargets and InstanceTargets.  By
     // example, this will lookup all annotations with either of the following
