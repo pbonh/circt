@@ -120,27 +120,6 @@ def LowerFIRRTLToHW : Pass<"lower-firrtl-to-hw", "mlir::ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
-// SynthFIRRTL
-//===----------------------------------------------------------------------===//
-
-def SynthFIRRTL : Pass<"synth-firrtl", "mlir::ModuleOp"> {
-  let summary = "Synthesize FIRRTL";
-  let description =
-    "Synthesize a module of FIRRTL dialect.";
-  let constructor = "circt::createSynthFIRRTLPass()";
-  let dependentDialects = ["comb::CombDialect", "hw::HWDialect",
-                           "sv::SVDialect"];
-  let options = [
-    Option<"enableAnnotationWarning", "warn-on-unprocessed-annotations",
-           "bool", "false",
-    "Emit warnings on unprocessed annotations during synth pass">,
-    Option<"nonConstAsyncResetValueIsError",
-           "error-on-non-const-async-reset-values", "bool", "false",
-    "Emit errors instead of warnings on non-constant async reset values">
-  ];
-}
-
-//===----------------------------------------------------------------------===//
 // HandshakeToFIRRTL
 //===----------------------------------------------------------------------===//
 

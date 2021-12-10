@@ -17,7 +17,6 @@ target_link_libraries(circt-opt
   CIRCTExportVerilog
   CIRCTFIRRTL
   CIRCTFIRRTLToHW
-  CIRCTSynthFIRRTL
   CIRCTFIRRTLTransforms
   CIRCTFSM
   CIRCTHandshake
