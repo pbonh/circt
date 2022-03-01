@@ -11,6 +11,6 @@
 
 #include "mlir/IR/Dialect.h"
 
-#include "OASIS/OASISOpsDialect.h.inc"
+#include "circt/Dialect/OASIS/OASISDialect.h.inc"
 
 #endif // OASIS_OASISDIALECT_H

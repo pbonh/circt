@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "OASIS/OASISDialect.h"
-#include "OASIS/OASISOps.h"
+#include "circt/Dialect/OASIS/OASISDialect.h"
+#include "circt/Dialect/OASIS/OASISOps.h"
 
 using namespace mlir;
 using namespace mlir::oasis;
@@ -19,6 +19,6 @@ using namespace mlir::oasis;
 void OASISDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "OASIS/OASISOps.cpp.inc"
+#include "circt/Dialect/OASIS/OASISOps.h.inc"
       >();
 }

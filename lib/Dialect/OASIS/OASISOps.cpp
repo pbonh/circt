@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "OASIS/OASISOps.h"
-#include "OASIS/OASISDialect.h"
+#include "circt/Dialect/OASIS/OASISOps.h"
+#include "circt/Dialect/OASIS/OASISDialect.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES
-#include "OASIS/OASISOps.cpp.inc"
+#include "circt/Dialect/OASIS/OASISOps.h.inc"

@@ -15,6 +15,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "OASIS/OASISOps.h.inc"
+#include "circt/Dialect/OASIS/OASISOps.h.inc"
 
 #endif // OASIS_OASISONEOPS_H
