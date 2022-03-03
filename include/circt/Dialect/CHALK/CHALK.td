@@ -1,4 +1,4 @@
-//===- OASIS.td - OASIS dialect definition ---------------*- tablegen -*-===//
+//===- CHALK.td - CHALK dialect definition ---------------*- tablegen -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,16 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the top level file for the OASIS dialect.
+// This is the top level file for the CHALK dialect.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef OASIS_TD
-#define OASIS_TD
+#ifndef CHALK_TD
+#define CHALK_TD
 
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-include "OASISOps.td"
+include "CHALKOps.td"
 
-#endif // OASIS_TD
+#endif // CHALK_TD

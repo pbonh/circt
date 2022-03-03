@@ -1,4 +1,4 @@
-//===- OASISOps.h - OASIS dialect ops -----------------*- C++ -*-===//
+//===- CHALKOps.h - CHALK dialect ops -----------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef OASIS_OASISOPS_H
-#define OASIS_OASISOPS_H
+#ifndef CHALK_CHALKOPS_H
+#define CHALK_CHALKOPS_H
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -15,6 +15,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "circt/Dialect/OASIS/OASISOps.h.inc"
+#include "circt/Dialect/CHALK/CHALKOps.h.inc"
 
-#endif // OASIS_OASISONEOPS_H
+#endif // CHALK_CHALKONEOPS_H

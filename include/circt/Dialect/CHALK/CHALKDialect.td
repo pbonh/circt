@@ -1,4 +1,4 @@
-//===- OASISDialect.td - OASIS dialect -----------*- tablegen -*-===//
+//===- CHALKDialect.td - CHALK dialect -----------*- tablegen -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,31 +6,31 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef OASIS_DIALECT
-#define OASIS_DIALECT
+#ifndef CHALK_DIALECT
+#define CHALK_DIALECT
 
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// OASIS dialect definition.
+// CHALK dialect definition.
 //===----------------------------------------------------------------------===//
 
-def OASIS_Dialect : Dialect {
-    let name = "oasis";
-    let summary = "A oasis out-of-tree MLIR dialect.";
+def CHALK_Dialect : Dialect {
+    let name = "chalk";
+    let summary = "A chalk out-of-tree MLIR dialect.";
     let description = [{
         This dialect is an example of an out-of-tree MLIR dialect designed to
         illustrate the basic setup required to develop MLIR-based tools without
         working inside of the LLVM source tree.
     }];
-    let cppNamespace = "::mlir::oasis";
+    let cppNamespace = "::mlir::chalk";
 }
 
 //===----------------------------------------------------------------------===//
-// Base oasis operation definition.
+// Base chalk operation definition.
 //===----------------------------------------------------------------------===//
 
-class OASIS_Op<string mnemonic, list<Trait> traits = []> :
-        Op<OASIS_Dialect, mnemonic, traits>;
+class CHALK_Op<string mnemonic, list<Trait> traits = []> :
+        Op<CHALK_Dialect, mnemonic, traits>;
 
-#endif // OASIS_DIALECT
+#endif // CHALK_DIALECT

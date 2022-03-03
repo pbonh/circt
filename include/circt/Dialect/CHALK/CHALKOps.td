@@ -1,4 +1,4 @@
-//===- OASISOps.td - OASIS dialect ops -----------*- tablegen -*-===//
+//===- CHALKOps.td - CHALK dialect ops -----------*- tablegen -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,18 +6,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef OASIS_OPS
-#define OASIS_OPS
+#ifndef CHALK_OPS
+#define CHALK_OPS
 
-include "OASISDialect.td"
+include "CHALKDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def OASIS_FooOp : OASIS_Op<"foo", [NoSideEffect,
+def CHALK_FooOp : CHALK_Op<"foo", [NoSideEffect,
                                              SameOperandsAndResultType]> {
     let summary = "Illustrates how to define an operation.";
     let description = [{
-        The `oasis.foo` operation illustrates how to define a new
+        The `chalk.foo` operation illustrates how to define a new
         operation in a dialect. It uses an operation trait to declare that it
         has no side effects.
 
@@ -28,7 +28,7 @@ def OASIS_FooOp : OASIS_Op<"foo", [NoSideEffect,
         ```mlir
         %0 = constant 2 : i32
         // Apply the foo operation to %0
-        %1 = oasis.foo %0 : i32
+        %1 = chalk.foo %0 : i32
         ```
     }];
 
@@ -40,4 +40,4 @@ def OASIS_FooOp : OASIS_Op<"foo", [NoSideEffect,
     }];
 }
 
-#endif // OASIS_OPS
+#endif // CHALK_OPS

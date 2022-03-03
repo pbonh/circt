@@ -1,14 +1,14 @@
 include_directories(.)
-add_circt_dialect_library(MLIROASIS
-  OASISDialect.cpp
-  OASISOps.cpp
+add_circt_dialect_library(MLIRCHALK
+  CHALKDialect.cpp
+  CHALKOps.cpp
   
   ADDITIONAL_HEADER_DIRS
-  ${CIRCT_MAIN_INCLUDE_DIR}/circt/Dialect/OASIS
+  ${CIRCT_MAIN_INCLUDE_DIR}/circt/Dialect/CHALK
   
   DEPENDS
-  MLIROASISIncGen
-  CIRCTOASISOpsIncGen
+  MLIRCHALKIncGen
+  CIRCTCHALKOpsIncGen
   
   LINK_COMPONENTS
   
@@ -22,6 +22,6 @@ add_circt_dialect_library(MLIROASIS
   )
 
 add_dependencies(circt-headers
-  MLIROASISIncGen
-  CIRCTOASISOpsIncGen
+  MLIRCHALKIncGen
+  CIRCTCHALKOpsIncGen
   )

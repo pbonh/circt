@@ -1,4 +1,4 @@
-//===- OASISDialect.cpp - OASIS dialect ---------------*- C++ -*-===//
+//===- CHALKDialect.cpp - CHALK dialect ---------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,19 +6,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Dialect/OASIS/OASISDialect.h"
-#include "circt/Dialect/OASIS/OASISOps.h"
+#include "circt/Dialect/CHALK/CHALKDialect.h"
+#include "circt/Dialect/CHALK/CHALKOps.h"
 
 using namespace mlir;
-using namespace mlir::oasis;
+using namespace mlir::chalk;
 
 //===----------------------------------------------------------------------===//
-// OASIS dialect.
+// CHALK dialect.
 //===----------------------------------------------------------------------===//
 
-void OASISDialect::initialize() {
+void CHALKDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "circt/Dialect/OASIS/OASISOps.h.inc"
+#include "circt/Dialect/CHALK/CHALKOps.h.inc"
       >();
 }
