@@ -15,7 +15,7 @@ include "mlir/IR/OpBase.td"
 // CHALK dialect definition.
 //===----------------------------------------------------------------------===//
 
-def CHALK_Dialect : Dialect {
+def CHALKDialect : Dialect {
     let name = "chalk";
     let summary = "A 2D IC layout MLIR dialect.";
     let description = [{
@@ -31,6 +31,6 @@ def CHALK_Dialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 class CHALK_Op<string mnemonic, list<Trait> traits = []> :
-        Op<CHALK_Dialect, mnemonic, traits>;
+        Op<CHALKDialect, mnemonic, traits>;
 
 #endif // CHALK_DIALECT

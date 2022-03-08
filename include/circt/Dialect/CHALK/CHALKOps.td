@@ -9,11 +9,12 @@
 #ifndef CHALK_OPS
 #define CHALK_OPS
 
-include "CHALKDialect.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def CHALK_CellOp : CHALK_Op<"cell", [NoSideEffect]> {
+include "CHALKDialect.td"
+
+def CellOp : CHALK_Op<"cell", [NoSideEffect]> {
     let summary = "A CHALK Cell represents heirarchy in the layout.";
     let description = [{
         The `chalk.cell` operation illustrates how to define a new
