@@ -15,9 +15,9 @@ mlir_tablegen(Passes.h.inc -gen-pass-decls)
 add_public_tablegen_target(CIRCTCHALKTransformsIncGen)
 add_circt_doc(Passes -gen-pass-doc CHALKPasses ./)
 
-#set(LLVM_TARGET_DEFINITIONS CHALKCanonicalization.td)
-#mlir_tablegen(CHALKCanonicalization.h.inc -gen-rewriters)
-#add_public_tablegen_target(CIRCTCHALKCanonicalizationIncGen)
+set(LLVM_TARGET_DEFINITIONS CHALKCanonicalization.td)
+mlir_tablegen(CHALKCanonicalization.h.inc -gen-rewriters)
+add_public_tablegen_target(CIRCTCHALKCanonicalizationIncGen)
 
 set(LLVM_TARGET_DEFINITIONS CHALKOpInterfaces.td)
 mlir_tablegen(CHALKOpInterfaces.h.inc -gen-op-interface-decls)

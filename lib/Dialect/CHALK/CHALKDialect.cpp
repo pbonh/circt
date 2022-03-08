@@ -9,8 +9,8 @@
 #include "circt/Dialect/CHALK/CHALKDialect.h"
 #include "circt/Dialect/CHALK/CHALKOps.h"
 
-using namespace mlir;
-using namespace mlir::chalk;
+using namespace circt;
+using namespace circt::chalk;
 
 //===----------------------------------------------------------------------===//
 // CHALK dialect.
@@ -19,6 +19,6 @@ using namespace mlir::chalk;
 void CHALKDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "circt/Dialect/CHALK/CHALKOps.h.inc"
+#include "circt/Dialect/CHALK/CHALK.cpp.inc"
       >();
 }

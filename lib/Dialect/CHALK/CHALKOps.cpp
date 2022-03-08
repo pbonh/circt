@@ -11,4 +11,4 @@
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES
-#include "circt/Dialect/CHALK/CHALKOps.h.inc"
+#include "circt/Dialect/CHALK/CHALKOps.cpp.inc"

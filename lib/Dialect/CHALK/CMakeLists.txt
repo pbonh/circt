@@ -8,7 +8,9 @@ add_circt_dialect_library(MLIRCHALK
   
   DEPENDS
   MLIRCHALKIncGen
-  CIRCTCHALKOpsIncGen
+  CIRCTCHALKEnumsIncGen
+  CIRCTCHALKCanonicalizationIncGen
+  CIRCTCHALKOpInterfacesIncGen
   
   LINK_COMPONENTS
   
@@ -23,5 +25,7 @@ add_circt_dialect_library(MLIRCHALK
 
 add_dependencies(circt-headers
   MLIRCHALKIncGen
-  CIRCTCHALKOpsIncGen
+  CIRCTCHALKEnumsIncGen
+  CIRCTCHALKCanonicalizationIncGen
+  CIRCTCHALKOpInterfacesIncGen
   )
