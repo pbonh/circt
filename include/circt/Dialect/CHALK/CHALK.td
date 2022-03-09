@@ -14,19 +14,16 @@
 #define CHALK_TD
 
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 def CHALKDialect : Dialect {
   let name = "chalk";
-
   let summary = "Types and operations for chalk dialect";
   let description = [{
     This dialect defines the `chalk` dialect, which is intended to be a generic
     representation of 2D VLSI layouts.
   }];
-  let hasConstantMaterializer = 1;
   let cppNamespace = "::circt::chalk";
 }
 
@@ -51,33 +48,58 @@ def CCellOp : CHALKOp<"cell", [IsolatedFromAbove, SingleBlock,
   let builders = [
     OpBuilder<(ins "StringAttr":$name)>
   ];
-
-  // let extraClassDeclaration = [{
-  //   Block *getBody() { return &body().front(); }
-
-  //   using iterator = Block::iterator;
-  //   iterator begin() { return getBody()->begin(); }
-  //   iterator end() { return getBody()->end(); }
-
-  //   Block::BlockArgListType getArguments() {
-  //     return getBody()->getArguments();
-  //   }
-
-  //   // Return the block argument for the port with the specified index.
-  //   BlockArgument getArgument(size_t portNumber);
-
-  //   OpBuilder getBodyBuilder() {
-  //     assert(!body().empty() && "Unexpected empty 'body' region.");
-  //     Block &bodyBlock = body().front();
-  //     return OpBuilder::atBlockEnd(&bodyBlock);
-  //   }
-
-  //   void getAsmBlockArgumentNames(mlir::Region &region,
-  //                                 mlir::OpAsmSetValueNameFn setNameFn);
-  // }];
-
 }
 
-include "circt/Dialect/HW/HWTypes.td"
+def CXYType : TypeDef<CHALKDialect, "CXY"> {
+  let mnemonic = "cxy";
+  let summary = "a pair of (x,y) coordinates";
+  let description = [{
+    Syntax:
+    ```
+    cxy-type ::= `cxy` `<` x-coord, y-coord `>`
+    ```
+
+    A pair of (x,y) coordinates.
+
+    Examples:
+
+    ```mlir
+    !chirrtl.cxy<0, 0>
+    !chirrtl.cxy<1, 27>
+    ```
+  }];
+
+  let parameters = (ins "uint64_t":$xCoord, "uint64_t":$yCoord);
+
+  // let builders = [
+  //   TypeBuilderWithInferredContext<(ins "uint64_t":$xCoord,
+  //                                       "uint64_t":$yCoord), [{
+  //     return $_get(elementType.getContext(), elementType, numElements);
+  //   }]>
+  // ];
+  let genVerifyDecl = 1;
+  // let assemblyFormat = "`< x=` $x `, y=` $y `>`";
+  let assemblyFormat = "`<` $xCoord `,` $yCoord `>`";
+}
+
+def CRectangleOp : CHALKOp<"rectangle", [IsolatedFromAbove, SingleBlock,
+                                    OpAsmOpInterface]> {
+  let summary = "CHALK Rectangle";
+  let description = [{
+    The "chalk.rectangle" operation represents a CHALK Rectangle, similar to 
+    GDSII/OASIS.
+  }];
+
+  let arguments = (ins);
+  // let arguments = (ins CXYType:$coord);
+  let results = (outs I32:$xC, I32:$yC);
+  let regions = (region SizedRegion<1>:$body);
+
+  let builders = [
+    OpBuilder<(ins "StringAttr":$name)>
+  ];
+}
+
+// include "circt/Dialect/HW/HWTypes.td"
 
 #endif // CHALK_TD
