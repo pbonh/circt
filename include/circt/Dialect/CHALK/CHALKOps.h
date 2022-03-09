@@ -35,24 +35,6 @@ class PatternRewriter;
 namespace circt {
 namespace chalk {
 
-using llvm::KnownBits;
-
-/// Compute "known bits" information about the specified value - the set of bits
-/// that are guaranteed to always be zero, and the set of bits that are
-/// guaranteed to always be one (these must be exclusive!).  A bit that exists
-/// in neither set is unknown.
-KnownBits computeKnownBits(Value value);
-
-/// Create a sign extension operation from a value of integer type to an equal
-/// or larger integer type.
-Value createOrFoldSExt(Location loc, Value value, Type destTy,
-                       OpBuilder &builder);
-Value createOrFoldSExt(Value value, Type destTy, ImplicitLocOpBuilder &builder);
-
-/// Create a ``Not'' gate on a value.
-Value createOrFoldNot(Location loc, Value value, OpBuilder &builder);
-Value createOrFoldNot(Value value, ImplicitLocOpBuilder &builder);
-
 } // namespace chalk
 } // namespace circt
 

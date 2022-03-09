@@ -34,6 +34,50 @@ def CHALKDialect : Dialect {
 class CHALKOp<string mnemonic, list<Trait> traits = []> :
     Op<CHALKDialect, mnemonic, traits>;
 
+def CCellOp : CHALKOp<"cell", [IsolatedFromAbove, SingleBlock,
+                                    OpAsmOpInterface]> {
+  let summary = "CHALK Cell";
+  let description = [{
+    The "chalk.cell" operation represents a CHALK Cell, similar to 
+    GDSII/OASIS.
+  }];
+
+  let arguments = (ins);
+  let results = (outs);
+  let regions = (region SizedRegion<1>:$body);
+
+  let skipDefaultBuilders = 1;
+  let hasCustomAssemblyFormat = 1;
+  let builders = [
+    OpBuilder<(ins "StringAttr":$name)>
+  ];
+
+  // let extraClassDeclaration = [{
+  //   Block *getBody() { return &body().front(); }
+
+  //   using iterator = Block::iterator;
+  //   iterator begin() { return getBody()->begin(); }
+  //   iterator end() { return getBody()->end(); }
+
+  //   Block::BlockArgListType getArguments() {
+  //     return getBody()->getArguments();
+  //   }
+
+  //   // Return the block argument for the port with the specified index.
+  //   BlockArgument getArgument(size_t portNumber);
+
+  //   OpBuilder getBodyBuilder() {
+  //     assert(!body().empty() && "Unexpected empty 'body' region.");
+  //     Block &bodyBlock = body().front();
+  //     return OpBuilder::atBlockEnd(&bodyBlock);
+  //   }
+
+  //   void getAsmBlockArgumentNames(mlir::Region &region,
+  //                                 mlir::OpAsmSetValueNameFn setNameFn);
+  // }];
+
+}
+
 include "circt/Dialect/HW/HWTypes.td"
 
 #endif // CHALK_TD
