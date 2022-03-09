@@ -9,8 +9,8 @@
 #include "circt/Dialect/CHALK/CHALKDialect.h"
 #include "circt/Dialect/CHALK/CHALKOps.h"
 
-using namespace mlir;
-using namespace mlir::chalk;
+using namespace circt;
+using namespace circt::chalk;
 
 //===----------------------------------------------------------------------===//
 // CHALK dialect.

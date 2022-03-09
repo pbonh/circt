@@ -23,6 +23,5 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 
 include "CHALKDialect.td"
 include "CHALKOps.td"
-include "CHALKStructure.td"
 
 #endif // CHALK_TD
