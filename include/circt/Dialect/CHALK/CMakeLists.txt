@@ -1,9 +1,10 @@
+# CHALK
 add_circt_dialect(CHALK chalk CHALK)
 add_circt_doc(CHALK -gen-dialect-doc CHALK Dialects/)
 
 set(LLVM_TARGET_DEFINITIONS CHALK.td)
 
-set(LLVM_TARGET_DEFINITIONS CHALKOps.td)
+#set(LLVM_TARGET_DEFINITIONS CHALKOps.td)
 #mlir_tablegen(CHALKOps.h.inc -gen-op-interface-decls)
 #mlir_tablegen(CHALKOps.cpp.inc -gen-op-interface-defs)
 #add_public_tablegen_target(CIRCTCHALKOpsIncGen)
