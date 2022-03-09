@@ -21,14 +21,6 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace llvm {
-struct KnownBits;
-}
-
-namespace mlir {
-class PatternRewriter;
-}
-
 #define GET_OP_CLASSES
 #include "circt/Dialect/CHALK/CHALK.h.inc"
 

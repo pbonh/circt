@@ -9,6 +9,7 @@ add_circt_dialect_library(CIRCTCHALK
   DEPENDS
   CIRCTHW
   MLIRCHALKIncGen
+  MLIRCHALKEnumsIncGen
   
   LINK_COMPONENTS
   Support
@@ -20,4 +21,4 @@ add_circt_dialect_library(CIRCTCHALK
   MLIRPass
    )
 
-add_dependencies(circt-headers MLIRCHALKIncGen)
+add_dependencies(circt-headers MLIRCHALKIncGen MLIRCHALKEnumsIncGen)

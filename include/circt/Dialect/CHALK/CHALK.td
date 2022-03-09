@@ -50,37 +50,37 @@ def CCellOp : CHALKOp<"cell", [IsolatedFromAbove, SingleBlock,
   ];
 }
 
-def CXYType : TypeDef<CHALKDialect, "CXY"> {
-  let mnemonic = "cxy";
-  let summary = "a pair of (x,y) coordinates";
-  let description = [{
-    Syntax:
-    ```
-    cxy-type ::= `cxy` `<` x-coord, y-coord `>`
-    ```
-
-    A pair of (x,y) coordinates.
-
-    Examples:
-
-    ```mlir
-    !chirrtl.cxy<0, 0>
-    !chirrtl.cxy<1, 27>
-    ```
-  }];
-
-  let parameters = (ins "uint64_t":$xCoord, "uint64_t":$yCoord);
-
-  // let builders = [
-  //   TypeBuilderWithInferredContext<(ins "uint64_t":$xCoord,
-  //                                       "uint64_t":$yCoord), [{
-  //     return $_get(elementType.getContext(), elementType, numElements);
-  //   }]>
-  // ];
-  let genVerifyDecl = 1;
-  // let assemblyFormat = "`< x=` $x `, y=` $y `>`";
-  let assemblyFormat = "`<` $xCoord `,` $yCoord `>`";
-}
+// def CXYType : TypeDef<CHALKDialect, "CXY"> {
+//   let mnemonic = "cxy";
+//   let summary = "a pair of (x,y) coordinates";
+//   let description = [{
+//     Syntax:
+//     ```
+//     cxy-type ::= `cxy` `<` x-coord, y-coord `>`
+//     ```
+// 
+//     A pair of (x,y) coordinates.
+// 
+//     Examples:
+// 
+//     ```mlir
+//     !chirrtl.cxy<0, 0>
+//     !chirrtl.cxy<1, 27>
+//     ```
+//   }];
+// 
+//   let parameters = (ins "uint64_t":$xCoord, "uint64_t":$yCoord);
+// 
+//   // let builders = [
+//   //   TypeBuilderWithInferredContext<(ins "uint64_t":$xCoord,
+//   //                                       "uint64_t":$yCoord), [{
+//   //     return $_get(elementType.getContext(), elementType, numElements);
+//   //   }]>
+//   // ];
+//   let genVerifyDecl = 1;
+//   // let assemblyFormat = "`< x=` $x `, y=` $y `>`";
+//   let assemblyFormat = "`<` $xCoord `,` $yCoord `>`";
+// }
 
 def CRectangleOp : CHALKOp<"rectangle", [IsolatedFromAbove, SingleBlock,
                                     OpAsmOpInterface]> {
@@ -92,7 +92,7 @@ def CRectangleOp : CHALKOp<"rectangle", [IsolatedFromAbove, SingleBlock,
 
   let arguments = (ins);
   // let arguments = (ins CXYType:$coord);
-  let results = (outs I32:$xC, I32:$yC);
+  let results = (outs I32:$width, I32:$height, I32:$xCoord, I32:$yCoord);
   let regions = (region SizedRegion<1>:$body);
 
   let builders = [

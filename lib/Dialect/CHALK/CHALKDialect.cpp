@@ -24,11 +24,23 @@ using namespace chalk;
 // Dialect specification.
 //===----------------------------------------------------------------------===//
 
+#define GET_TYPEDEF_CLASSES
+#include "circt/Dialect/CHALK/CHALKTypes.cpp.inc"
+
+#define GET_OP_CLASSES
+#include "circt/Dialect/CHALK/CHALK.cpp.inc"
+
 void CHALKDialect::initialize() {
   // Register operations.
   addOperations<
 #define GET_OP_LIST
 #include "circt/Dialect/CHALK/CHALK.cpp.inc"
+      >();
+
+  // Register types.
+  addTypes<
+#define GET_TYPEDEF_LIST
+#include "circt/Dialect/CHALK/CHALKTypes.cpp.inc"
       >();
 }
 
