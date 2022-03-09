@@ -5,3 +5,8 @@ set(LLVM_TARGET_DEFINITIONS CHALK.td)
 mlir_tablegen(CHALKEnums.h.inc -gen-enum-decls)
 mlir_tablegen(CHALKEnums.cpp.inc -gen-enum-defs)
 add_public_tablegen_target(MLIRCHALKEnumsIncGen)
+
+set(LLVM_TARGET_DEFINITIONS Passes.td)
+mlir_tablegen(Passes.h.inc -gen-pass-decls)
+add_public_tablegen_target(CIRCTCHALKTransformsIncGen)
+add_circt_doc(Passes -gen-pass-doc CHALKPasses ./)
