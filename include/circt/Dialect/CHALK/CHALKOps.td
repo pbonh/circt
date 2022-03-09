@@ -9,8 +9,7 @@
 #ifndef CHALK_OPS
 #define CHALK_OPS
 
-include "mlir/Interfaces/InferTypeOpInterface.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/OpBase.td"
 
 include "CHALKDialect.td"
 
