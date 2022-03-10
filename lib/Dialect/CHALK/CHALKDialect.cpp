@@ -15,10 +15,11 @@
 #include "circt/Dialect/HW/HWOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Types.h"
 #include "mlir/IR/DialectImplementation.h"
 
 using namespace circt;
-using namespace chalk;
+using namespace circt::chalk;
 
 //===----------------------------------------------------------------------===//
 // Dialect specification.
@@ -37,7 +38,6 @@ void CHALKDialect::initialize() {
 #include "circt/Dialect/CHALK/CHALK.cpp.inc"
       >();
 
-  // Register types.
   addTypes<
 #define GET_TYPEDEF_LIST
 #include "circt/Dialect/CHALK/CHALKTypes.cpp.inc"
@@ -49,3 +49,28 @@ void CHALKDialect::initialize() {
 
 #include "circt/Dialect/CHALK/CHALKDialect.cpp.inc"
 
+// void CXYType::print(AsmPrinter &printer) const {
+//   printer << "<";
+//   // Don't print element types with "!firrtl.".
+//   firrtl::printNestedType(getElementType(), printer);
+//   printer << ", " << getNumElements() << ">";
+// }
+// 
+// Type CXYType::parse(AsmParser &parser) {
+//   FIRRTLType elementType;
+//   uint64_t numElements;
+//   if (parser.parseLess() || firrtl::parseNestedType(elementType, parser) ||
+//       parser.parseComma() || parser.parseInteger(numElements) ||
+//       parser.parseGreater())
+//     return {};
+//   return parser.getChecked<CXYType>(elementType, numElements);
+// }
+// 
+// LogicalResult CXYType::verify(function_ref<InFlightDiagnostic()> emitError,
+//                                   FIRRTLType elementType,
+//                                   uint64_t numElements) {
+//   if (!elementType.isPassive()) {
+//     return emitError() << "behavioral memory element type must be passive";
+//   }
+//   return success();
+// }

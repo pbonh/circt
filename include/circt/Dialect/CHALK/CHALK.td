@@ -51,7 +51,7 @@ def CCellOp : CHALKOp<"cell", [IsolatedFromAbove, SingleBlock,
 }
 
 // def CXYType : TypeDef<CHALKDialect, "CXY"> {
-//   let mnemonic = "cxy";
+//   // let mnemonic = "cxy";
 //   let summary = "a pair of (x,y) coordinates";
 //   let description = [{
 //     Syntax:
@@ -77,10 +77,16 @@ def CCellOp : CHALKOp<"cell", [IsolatedFromAbove, SingleBlock,
 //   //     return $_get(elementType.getContext(), elementType, numElements);
 //   //   }]>
 //   // ];
-//   let genVerifyDecl = 1;
+//   // let genVerifyDecl = 1;
 //   // let assemblyFormat = "`< x=` $x `, y=` $y `>`";
 //   let assemblyFormat = "`<` $xCoord `,` $yCoord `>`";
 // }
+
+def MyPairType : TypeDef<CHALKDialect, "MyPairType"> {
+  let parameters = (ins "int":$a, "int":$b);
+  let mnemonic = "pair";
+  let assemblyFormat = "`<` params `>`";
+}
 
 def CRectangleOp : CHALKOp<"rectangle", [IsolatedFromAbove, SingleBlock,
                                     OpAsmOpInterface]> {
