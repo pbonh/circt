@@ -11,7 +11,6 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/FunctionInterfaces.td"
-include "circt/Dialect/HW/HWTypes.td"
 include "circt/Types.td"
 
 include "CHALKDialect.td"

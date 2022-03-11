@@ -18,17 +18,17 @@ def CHALKDialect : Dialect {
     2D VLSI layouts.
   }];
 
-  let hasConstantMaterializer = 1;
-  let dependentDialects = [
-    "circt::hw::HWDialect"
-  ];
+  // let hasConstantMaterializer = 1;
+  // let dependentDialects = [
+  //   "circt::hw::HWDialect"
+  // ];
+  // let extraClassDeclaration = [{
+  //   /// Register all CHALK types.
+  //   void registerTypes();
+  //   /// Register all attributes.
+  //   void registerAttributes();
+  // }];
   let cppNamespace = "::circt::chalk";
-  let extraClassDeclaration = [{
-    /// Register all CHALK types.
-    void registerTypes();
-    /// Register all attributes.
-    void registerAttributes();
-  }];
 }
 
 // Base class for the operations in this dialect.

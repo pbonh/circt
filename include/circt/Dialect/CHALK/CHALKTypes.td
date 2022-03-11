@@ -9,6 +9,9 @@
 #ifndef CIRCT_DIALECT_CHALK_CHALKTYPES_TD
 #define CIRCT_DIALECT_CHALK_CHALKTYPES_TD
 
+// Base class for the types in this dialect.
+class CHALKType<string name> : TypeDef<CHALKDialect, name> {}
+
 def InstanceType : CHALKType<"Instance"> {
   let summary = "An CHALK instance type";
   let description = [{
