@@ -21,12 +21,12 @@ using namespace chalk;
 // CellOp
 //===----------------------------------------------------------------------===//
 
-void CellOp::build(OpBuilder &builder, OperationState &state, StringRef name,
+void CellOp::build(OpBuilder &builder, OperationState &state, StringRef cell_name,
                       Type stateType, FunctionType type,
                       ArrayRef<NamedAttribute> attrs,
                       ArrayRef<DictionaryAttr> argAttrs) {
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(name));
+                     builder.getStringAttr(cell_name));
   state.addAttribute("stateType", TypeAttr::get(stateType));
   state.addAttribute(getTypeAttrName(), TypeAttr::get(type));
   state.attributes.append(attrs.begin(), attrs.end());
@@ -37,31 +37,6 @@ void CellOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   assert(type.getNumInputs() == argAttrs.size());
   function_interface_impl::addArgAndResultAttrs(builder, state, argAttrs,
                                                 /*resultAttrs=*/llvm::None);
-}
-
-/// Get the port information of the machine.
-void CellOp::getHWPortInfo(SmallVectorImpl<hw::PortInfo> &ports) {
-  ports.clear();
-  auto machineType = getType();
-  auto builder = Builder(*this);
-
-  for (unsigned i = 0, e = machineType.getNumInputs(); i < e; ++i) {
-    hw::PortInfo port;
-    port.name = builder.getStringAttr("in" + std::to_string(i));
-    port.direction = circt::hw::PortDirection::INPUT;
-    port.type = machineType.getInput(i);
-    port.argNum = i;
-    ports.push_back(port);
-  }
-
-  for (unsigned i = 0, e = machineType.getNumResults(); i < e; ++i) {
-    hw::PortInfo port;
-    port.name = builder.getStringAttr("out" + std::to_string(i));
-    port.direction = circt::hw::PortDirection::OUTPUT;
-    port.type = machineType.getResult(i);
-    port.argNum = i;
-    ports.push_back(port);
-  }
 }
 
 ParseResult CellOp::parse(OpAsmParser &parser, OperationState &result) {

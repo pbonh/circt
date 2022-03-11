@@ -13,8 +13,6 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
-def HasCustomSSAName : DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>;
-
 def CellOp : CHALKOp<"cell", [HasParent<"mlir::ModuleOp">, FunctionOpInterface,
       Symbol, SymbolTable, IsolatedFromAbove, NoTerminator]> {
   let summary = "Define a 2D VLSI layout";
@@ -23,19 +21,16 @@ def CellOp : CHALKOp<"cell", [HasParent<"mlir::ModuleOp">, FunctionOpInterface,
     multiple shapes, paths, or placements.
   }];
 
-  let arguments = (ins StrAttr:$sym_name, TypeAttr:$stateType, TypeAttr:$type);
+  let arguments = (ins StrAttr:$cell_name, TypeAttr:$stateType, TypeAttr:$type);
   let regions = (region SizedRegion<1>:$body);
 
   let builders = [
-    OpBuilder<(ins "StringRef":$name, "Type":$stateType, "FunctionType":$type,
+    OpBuilder<(ins "StringRef":$cell_name, "Type":$stateType, "FunctionType":$type,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
       CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)>
   ];
 
   let extraClassDeclaration = [{
-    /// Get the port information of the machine.
-    void getHWPortInfo(SmallVectorImpl<hw::PortInfo> &);
-
     /// Returns the type of this function.
     FunctionType getType() { 
       return getTypeAttr().getValue().cast<FunctionType>();
