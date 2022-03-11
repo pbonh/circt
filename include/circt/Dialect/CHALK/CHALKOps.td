@@ -11,6 +11,7 @@
 
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 def CellOp : CHALKOp<"cell", [HasParent<"mlir::ModuleOp">, FunctionOpInterface,
@@ -49,6 +50,20 @@ def CellOp : CHALKOp<"cell", [HasParent<"mlir::ModuleOp">, FunctionOpInterface,
 
   let hasCustomAssemblyFormat = 1;
   let verifier = [{ return ::verify$cppClass(*this); }];
+}
+
+def RectangleOp : CHALKOp<"rectangle", [HasParent<"CellOp">, Symbol]> {
+  let summary = "Define a state of a machine";
+  let description = [{
+    `chalk.rectangle` represents a rectangle in a 2D VLSI layout. It
+    uses attributes to store the (x,y) coordinates and the height
+    and width.
+  }];
+  let arguments = (ins
+    CellIntAttr:$xCoord,
+    CellIntAttr:$yCoord
+  );
+  let results = (outs);
 }
 
 #endif // CIRCT_DIALECT_CHALK_CHALKOPS_TD

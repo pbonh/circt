@@ -14,6 +14,7 @@ include "mlir/IR/FunctionInterfaces.td"
 include "circt/Types.td"
 
 include "CHALKDialect.td"
+include "CHALKAttributes.td"
 include "CHALKTypes.td"
 include "CHALKOps.td"
 
