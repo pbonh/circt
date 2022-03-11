@@ -21,24 +21,6 @@ using namespace chalk;
 // CellOp
 //===----------------------------------------------------------------------===//
 
-void CellOp::build(OpBuilder &builder, OperationState &state, StringRef cell_name,
-                      Type stateType, FunctionType type,
-                      ArrayRef<NamedAttribute> attrs,
-                      ArrayRef<DictionaryAttr> argAttrs) {
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(cell_name));
-  state.addAttribute("stateType", TypeAttr::get(stateType));
-  state.addAttribute(getTypeAttrName(), TypeAttr::get(type));
-  state.attributes.append(attrs.begin(), attrs.end());
-  state.addRegion();
-
-  if (argAttrs.empty())
-    return;
-  assert(type.getNumInputs() == argAttrs.size());
-  function_interface_impl::addArgAndResultAttrs(builder, state, argAttrs,
-                                                /*resultAttrs=*/llvm::None);
-}
-
 ParseResult CellOp::parse(OpAsmParser &parser, OperationState &result) {
   auto buildFuncType =
       [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
@@ -55,39 +37,17 @@ void CellOp::print(OpAsmPrinter &p) {
       p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 
-static LogicalResult compareTypes(TypeRange rangeA, TypeRange rangeB) {
-  if (rangeA.size() != rangeB.size())
-    return failure();
-
-  int64_t index = 0;
-  for (auto zip : llvm::zip(rangeA, rangeB)) {
-    if (std::get<0>(zip) != std::get<1>(zip))
-      return failure();
-    ++index;
-  }
-
-  return success();
-}
-
 static LogicalResult verifyCellOp(CellOp op) {
-  // If this function is external there is nothing to do.
-  if (op.isExternal())
-    return success();
+  // // If this function is external there is nothing to do.
+  // if (op.isExternal())
+  //   return success();
 
-  if (!op.stateType().isa<IntegerType>())
-    return op.emitOpError("state must be integer type");
+  if (op.cell_name().empty())
+    return op.emitOpError("Cell must be named");
 
-  // Verify that the argument list of the function and the arg list of the entry
-  // block line up.  The trait already verified that the number of arguments is
-  // the same between the signature and the block.
-  if (failed(compareTypes(op.getType().getInputs(),
-                          op.front().getArgumentTypes())))
-    return op.emitOpError(
-        "entry block argument types must match the machine input types");
-
-  // Verify that the machine only has one block terminated with OutputOp.
-  if (!llvm::hasSingleElement(op))
-    return op.emitOpError("must only have a single block");
+  // // Verify that the machine only has one block terminated with OutputOp.
+  // if (!llvm::hasSingleElement(op))
+  //   return op.emitOpError("must only have a single block");
 
   return success();
 }

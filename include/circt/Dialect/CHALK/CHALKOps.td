@@ -21,14 +21,8 @@ def CellOp : CHALKOp<"cell", [HasParent<"mlir::ModuleOp">, FunctionOpInterface,
     multiple shapes, paths, or placements.
   }];
 
-  let arguments = (ins StrAttr:$cell_name, TypeAttr:$stateType, TypeAttr:$type);
-  let regions = (region SizedRegion<1>:$body);
-
-  let builders = [
-    OpBuilder<(ins "StringRef":$cell_name, "Type":$stateType, "FunctionType":$type,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
-      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)>
-  ];
+  let arguments = (ins StrAttr:$cell_name);
+  // let regions = (region SizedRegion<1>:$body);
 
   let extraClassDeclaration = [{
     /// Returns the type of this function.
