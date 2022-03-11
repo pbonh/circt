@@ -11,25 +11,10 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/FunctionInterfaces.td"
+include "circt/Dialect/HW/HWTypes.td"
+include "circt/Types.td"
 
-def CHALKDialect : Dialect {
-  let name = "chalk";
-  let summary = "Types and operations for CHALK dialect";
-  let description = [{
-    This dialect defines the `chalk` dialect, which is intended to represent
-    finite-state machines.
-  }];
-
-  let cppNamespace = "::circt::chalk";
-}
-
-// Base class for the types in this dialect.
-class CHALKType<string name> : TypeDef<CHALKDialect, name> {}
-
-// Base class for the operations in this dialect.
-class CHALKOp<string mnemonic, list<Trait> traits = []> :
-    Op<CHALKDialect, mnemonic, traits>;
-
+include "CHALKDialect.td"
 include "CHALKTypes.td"
 include "CHALKOps.td"
 
