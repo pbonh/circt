@@ -52,7 +52,7 @@ def CellOp : CHALKOp<"cell", [HasParent<"mlir::ModuleOp">, FunctionOpInterface,
   let verifier = [{ return ::verify$cppClass(*this); }];
 }
 
-def RectangleOp : CHALKOp<"rectangle", [HasParent<"CellOp">, Symbol]> {
+def RectangleOp : CHALKOp<"rectangle", [HasParent<"CellOp">]> {
   let summary = "Define a state of a machine";
   let description = [{
     `chalk.rectangle` represents a rectangle in a 2D VLSI layout. It
@@ -60,8 +60,10 @@ def RectangleOp : CHALKOp<"rectangle", [HasParent<"CellOp">, Symbol]> {
     and width.
   }];
   let arguments = (ins
-    CellIntAttr:$xCoord,
-    CellIntAttr:$yCoord
+    I64Attr:$xCoord,
+    I64Attr:$yCoord,
+    UI64Attr:$width,
+    UI64Attr:$height
   );
   let results = (outs);
 }

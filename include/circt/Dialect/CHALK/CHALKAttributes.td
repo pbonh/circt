@@ -19,5 +19,6 @@
 
 def CellIntAttr: ArrayAttrBase< And<[CPred<"$_self.isa<::mlir::ArrayAttr>()">]>, ""> { }
 // def CellIntAttr: AttrConstraint<CPred<"$_self.isa<IntegerAttr>()">, "Integer Type"> { }
+// def HasSomeProperty : AnyIntegerAttrBase< And<[CPred<"$_self.isa<::mlir::IntegerAttr>()">]>, "Integer type">;
 
 #endif // CIRCT_DIALECT_CHALK_CHALKATTRIBUTES_TD
