@@ -8,6 +8,7 @@
 
 #include "circt/Dialect/CHALK/CHALKDialect.h"
 #include "circt/Dialect/CHALK/CHALKOps.h"
+#include "mlir/IR/DialectImplementation.h"
 
 using namespace circt;
 using namespace chalk;

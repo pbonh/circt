@@ -9,6 +9,7 @@
 #ifndef CIRCT_DIALECT_CHALK_CHALKDIALECT_H
 #define CIRCT_DIALECT_CHALK_CHALKDIALECT_H
 
+#include "circt/Support/LLVM.h"
 #include "mlir/IR/Dialect.h"
 
 // Pull in the dialect definition.

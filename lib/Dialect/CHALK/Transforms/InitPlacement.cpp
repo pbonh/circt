@@ -31,6 +31,14 @@ struct InitPlacementPass : public InitPlacementBase<InitPlacementPass> {
 } // end anonymous namespace
 
 void InitPlacementPass::runOnOperation() {
+    auto cell = getOperation();
+    auto *ctx = cell.getContext();
+    if (ctx) {
+        signalPassFailure();
+    }
+    else {
+        signalPassFailure();
+    }
 }
 
 std::unique_ptr<mlir::Pass> circt::chalk::createInitPlacementPass() {
