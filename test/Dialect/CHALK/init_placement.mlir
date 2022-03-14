@@ -1,6 +1,6 @@
-// RUN: circt-opt --pass-pipeline='chalk.cell(chalk-init-placement)' -split-input-file %s |FileCheck %s
+// RUN: circt-opt --pass-pipeline='chalk.cell(chalk-init-placement)' %s |FileCheck %s
 
-// CHECK: chalk.cell @CombNode
+// CHECK: chalk.cell @CombNode() {
 chalk.cell @CombNode() {
-    chalk.rectangle() {xCoord = 0, yCoord = 0, width = 0, height = 0}
+    chalk.rectangle {xCoord = 0 : i64, yCoord = 0 : i64, width = 0 : ui64, height = 0 : ui64}
 }
