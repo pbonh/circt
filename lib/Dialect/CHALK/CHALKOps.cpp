@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "circt/Dialect/CHALK/CHALKOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/FunctionImplementation.h"
