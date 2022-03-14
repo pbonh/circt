@@ -16,3 +16,5 @@ add_circt_dialect_library(CIRCTCHALK
   MLIRIR
   MLIRPass
   )
+
+add_subdirectory(Transforms)
