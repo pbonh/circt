@@ -25,7 +25,7 @@
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Threading.h"
 #include "mlir/IR/Verifier.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1636,7 +1636,17 @@ private:
 void FIRStmtParser::emitInvalidate(Value val, Flow flow) {
   auto tpe = val.getType().cast<FIRRTLType>();
 
-  // Recurse until we hit leaves.  Connect any leaves which have sink or
+  if (tpe.isPassive()) {
+    if (flow == Flow::Source || tpe.isa<AnalogType>())
+      return;
+    if (tpe.hasUninferredWidth())
+      builder.create<ConnectOp>(val, builder.create<InvalidValueOp>(tpe));
+    else
+      builder.create<StrictConnectOp>(val, builder.create<InvalidValueOp>(tpe));
+    return;
+  }
+
+  // Recurse until we hit passive leaves.  Connect any leaves which have sink or
   // duplex flow.
   //
   // TODO: This is very similar to connect expansion in the LowerTypes pass
@@ -1667,13 +1677,6 @@ void FIRStmtParser::emitInvalidate(Value val, Flow flow) {
           }
           emitInvalidate(subindex, flow);
         }
-      })
-      // Drop invalidation of analog.
-      .Case<AnalogType>([](auto) {})
-      // Invalidate any sink or duplex flow ground types.
-      .Default([&](auto tpe) {
-        if (flow != Flow::Source)
-          builder.create<ConnectOp>(val, builder.create<InvalidValueOp>(tpe));
       });
 }
 
@@ -2717,14 +2720,22 @@ ParseResult FIRStmtParser::parseLeadingExpStmt(Value lhs) {
 
   locationProcessor.setLoc(loc);
 
+  auto lhsPType = lhs.getType().cast<FIRRTLType>().getPassiveType();
+  auto rhsPType = rhs.getType().cast<FIRRTLType>().getPassiveType();
+  if (lhsPType == rhsPType && false) {
+    if (lhsPType.hasUninferredWidth())
+      builder.create<ConnectOp>(lhs, rhs);
+    else
+      builder.create<StrictConnectOp>(lhs, rhs);
+    return success();
+  }
+
   if (kind == FIRToken::less_equal) {
     // Some operations, dshl for example, have implicit truncations, even in lo
     // firrtl.  Chisel will also use connects as partial connects to do
     // truncation.  Handle truncations as partial connects, which allow
     // truncation.
-    auto lhsPType = lhs.getType().cast<FIRRTLType>().getPassiveType();
-    auto rhsPType = rhs.getType().cast<FIRRTLType>().getPassiveType();
-    if (lhsPType != rhsPType && lhsPType.getBitWidthOrSentinel() >= 0 &&
+    if (lhsPType.getBitWidthOrSentinel() >= 0 &&
         lhsPType.getBitWidthOrSentinel() < rhsPType.getBitWidthOrSentinel()) {
       builder.create<PartialConnectOp>(lhs, rhs);
     } else {

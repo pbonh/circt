@@ -26,7 +26,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace circt;
 using namespace mlir;
@@ -635,23 +636,32 @@ LogicalResult circt::llhd::EntityOp::verifyType() {
 
 LogicalResult circt::llhd::EntityOp::verifyBody() {
   // check signal names are unique
-  llvm::StringMap<bool> sigMap;
-  llvm::StringMap<bool> instMap;
-  auto walkResult = walk([&sigMap, &instMap](Operation *op) -> WalkResult {
-    if (auto sigOp = dyn_cast<SigOp>(op)) {
-      if (sigMap[sigOp.name()]) {
-        return sigOp.emitError("Redefinition of signal named '")
-               << sigOp.name() << "'!";
-      }
-      sigMap.insert_or_assign(sigOp.name(), true);
-    } else if (auto instOp = dyn_cast<InstOp>(op)) {
-      if (instMap[instOp.name()]) {
-        return instOp.emitError("Redefinition of instance named '")
-               << instOp.name() << "'!";
-      }
-      instMap.insert_or_assign(instOp.name(), true);
-    }
-    return WalkResult::advance();
+  llvm::StringSet sigSet;
+  llvm::StringSet instSet;
+  auto walkResult = walk([&sigSet, &instSet](Operation *op) -> WalkResult {
+    return TypeSwitch<Operation *, WalkResult>(op)
+        .Case<SigOp>([&](auto sigOp) -> WalkResult {
+          if (!sigSet.insert(sigOp.name()).second)
+            return sigOp.emitError("redefinition of signal named '")
+                   << sigOp.name() << "'!";
+
+          return success();
+        })
+        .Case<OutputOp>([&](auto outputOp) -> WalkResult {
+          if (outputOp.name() && !sigSet.insert(*outputOp.name()).second)
+            return outputOp.emitError("redefinition of signal named '")
+                   << *outputOp.name() << "'!";
+
+          return success();
+        })
+        .Case<InstOp>([&](auto instOp) -> WalkResult {
+          if (!instSet.insert(instOp.name()).second)
+            return instOp.emitError("redefinition of instance named '")
+                   << instOp.name() << "'!";
+
+          return success();
+        })
+        .Default([](auto op) -> WalkResult { return WalkResult::advance(); });
   });
 
   return failure(walkResult.wasInterrupted());
@@ -841,10 +851,6 @@ static LogicalResult verify(llhd::InstOp op) {
 
   auto proc = op->getParentOfType<ModuleOp>().lookupSymbol<llhd::ProcOp>(
       calleeAttr.getValue());
-  auto entity = op->getParentOfType<ModuleOp>().lookupSymbol<llhd::EntityOp>(
-      calleeAttr.getValue());
-
-  // Verify that the input and output types match the callee.
   if (proc) {
     auto type = proc.getType();
 
@@ -856,12 +862,16 @@ static LogicalResult verify(llhd::InstOp op) {
       return op.emitOpError(
           "incorrect number of outputs for proc instantiation");
 
-    for (size_t i = 0, e = type.getNumInputs(); i != e; ++i)
+    for (size_t i = 0, e = type.getNumInputs(); i != e; ++i) {
       if (op.getOperand(i).getType() != type.getInput(i))
         return op.emitOpError("operand type mismatch");
+    }
 
     return success();
   }
+
+  auto entity = op->getParentOfType<ModuleOp>().lookupSymbol<llhd::EntityOp>(
+      calleeAttr.getValue());
   if (entity) {
     auto type = entity.getType();
 
@@ -873,14 +883,51 @@ static LogicalResult verify(llhd::InstOp op) {
       return op.emitOpError(
           "incorrect number of outputs for entity instantiation");
 
-    for (size_t i = 0, e = type.getNumInputs(); i != e; ++i)
+    for (size_t i = 0, e = type.getNumInputs(); i != e; ++i) {
       if (op.getOperand(i).getType() != type.getInput(i))
         return op.emitOpError("operand type mismatch");
+    }
 
     return success();
   }
-  return op.emitOpError() << "'" << calleeAttr.getValue()
-                          << "' does not reference a valid proc or entity";
+
+  auto module = op->getParentOfType<ModuleOp>().lookupSymbol<hw::HWModuleOp>(
+      calleeAttr.getValue());
+  if (module) {
+    auto type = module.getType();
+
+    if (type.getNumInputs() != op.inputs().size())
+      return op.emitOpError(
+          "incorrect number of inputs for hw.module instantiation");
+
+    if (type.getNumResults() + type.getNumInputs() != op.getNumOperands())
+      return op.emitOpError(
+          "incorrect number of outputs for hw.module instantiation");
+
+    // Check input types
+    for (size_t i = 0, e = type.getNumInputs(); i != e; ++i) {
+      if (op.getOperand(i)
+              .getType()
+              .cast<llhd::SigType>()
+              .getUnderlyingType() != type.getInput(i))
+        return op.emitOpError("input type mismatch");
+    }
+
+    // Check output types
+    for (size_t i = 0, e = type.getNumResults(); i != e; ++i) {
+      if (op.getOperand(type.getNumInputs() + i)
+              .getType()
+              .cast<llhd::SigType>()
+              .getUnderlyingType() != type.getResult(i))
+        return op.emitOpError("output type mismatch");
+    }
+
+    return success();
+  }
+
+  return op.emitOpError()
+         << "'" << calleeAttr.getValue()
+         << "' does not reference a valid proc, entity, or hw.module";
 }
 
 FunctionType llhd::InstOp::getCalleeType() {

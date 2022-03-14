@@ -20,6 +20,7 @@
 #include "circt/Dialect/HW/HWAttributes.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HW/HWTypes.h"
+#include "circt/Dialect/HW/Namespace.h"
 #include "circt/Dialect/SV/SVOps.h"
 #include "circt/Support/Namespace.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -424,10 +425,10 @@ private:
                                       Block *topLevelModule,
                                       CircuitLoweringState &loweringState);
 
-  void lowerModuleBody(FModuleOp oldModule,
-                       CircuitLoweringState &loweringState);
-  void lowerModuleOperations(hw::HWModuleOp module,
-                             CircuitLoweringState &loweringState);
+  LogicalResult lowerModuleBody(FModuleOp oldModule,
+                                CircuitLoweringState &loweringState);
+  LogicalResult lowerModuleOperations(hw::HWModuleOp module,
+                                      CircuitLoweringState &loweringState);
 
   void lowerMemoryDecls(ArrayRef<FirMemory> mems,
                         CircuitLoweringState &loweringState);
@@ -491,17 +492,23 @@ void FIRRTLModuleLowering::runOnOperation() {
 
   state.processRemainingAnnotations(circuit, circuitAnno);
   // Iterate through each operation in the circuit body, transforming any
-  // FModule's we come across.
+  // FModule's we come across. If any module fails to lower, return early.
   for (auto &op : make_early_inc_range(circuitBody->getOperations())) {
     TypeSwitch<Operation *>(&op)
         .Case<FModuleOp>([&](auto module) {
-          state.oldToNewModuleMap[&op] =
-              lowerModule(module, topLevelModule, state);
+          auto loweredMod = lowerModule(module, topLevelModule, state);
+          if (!loweredMod)
+            return signalPassFailure();
+
+          state.oldToNewModuleMap[&op] = loweredMod;
           modulesToProcess.push_back(module);
         })
         .Case<FExtModuleOp>([&](auto extModule) {
-          state.oldToNewModuleMap[&op] =
-              lowerExtModule(extModule, topLevelModule, state);
+          auto loweredExtMod = lowerExtModule(extModule, topLevelModule, state);
+          if (!loweredExtMod)
+            return signalPassFailure();
+
+          state.oldToNewModuleMap[&op] = loweredExtMod;
         })
         .Case<NonLocalAnchor>([&](auto nla) {
           // Just drop it.
@@ -512,27 +519,74 @@ void FIRRTLModuleLowering::runOnOperation() {
           // the operation from the circuit.
           if (succeeded(verifyOpLegality(op)))
             op->moveBefore(topLevelModule, topLevelModule->end());
+          else
+            return signalPassFailure();
         });
+  }
+
+  // Figure out which module is the DUT and TestHarness.  If there is no module
+  // marked as the DUT, the top module is the DUT. If the DUT and the test
+  // harness are the same, then there is no test harness.
+  Operation *testHarness = state.getInstanceGraph()->getTopLevelModule();
+  Operation *dut = state.getDut();
+  if (!dut) {
+    dut = testHarness;
+    testHarness = nullptr;
+  } else if (dut == testHarness) {
+    testHarness = nullptr;
   }
 
   // Now update all the testbench modules' paths.  A module goes in the TB
   // directory if it isn't a child of the DUT and a DUT is marked.
-  if (tbdir) {
-    if (auto dut = state.getDut()) {
-      for (auto mod : state.oldToNewModuleMap) {
-        if (state.isInTestHarness(mod.first)) {
-          auto outputFile = hw::OutputFileAttr::getAsDirectory(
-              circuit.getContext(), tbdir.getValue(), false, true);
-          mod.second->setAttr("output_file", outputFile);
-        }
+  if (tbdir && testHarness) {
+    auto outputFile = hw::OutputFileAttr::getAsDirectory(
+        circuit.getContext(), tbdir.getValue(), false, true);
+    for (auto mod : state.oldToNewModuleMap) {
+      if (state.isInTestHarness(mod.first)) {
+        mod.second->setAttr("output_file", outputFile);
       }
     }
   }
 
-  // At this point, it is safe to the module hierarchy annotations, since they
-  // would have been used while lowering modules.
-  circuitAnno.removeAnnotationsWithClass(moduleHierAnnoClass,
-                                         testHarnessHierAnnoClass);
+  // Handle the creation of the module hierarchy metadata.
+
+  // Collect the two sets of hierarchy files from the circuit. Some of them will
+  // be rooted at the test harness, the others will be rooted at the DUT.
+  SmallVector<Attribute> dutHierarchyFiles;
+  SmallVector<Attribute> testHarnessHierarchyFiles;
+  circuitAnno.removeAnnotations([&](Annotation annotation) {
+    if (annotation.isClass(moduleHierAnnoClass)) {
+      auto file = hw::OutputFileAttr::getFromFilename(
+          &getContext(),
+          annotation.getMember<StringAttr>("filename").getValue(),
+          /*excludeFromFileList=*/true);
+      dutHierarchyFiles.push_back(file);
+      return true;
+    }
+    if (annotation.isClass(testHarnessHierAnnoClass)) {
+      auto file = hw::OutputFileAttr::getFromFilename(
+          &getContext(),
+          annotation.getMember<StringAttr>("filename").getValue(),
+          /*excludeFromFileList=*/true);
+      // If there is no testharness, we print the hiearchy for this file
+      // starting at the DUT.
+      if (testHarness)
+        testHarnessHierarchyFiles.push_back(file);
+      else
+        dutHierarchyFiles.push_back(file);
+      return true;
+    }
+    return false;
+  });
+  // Attach the lowered form of these annotations.
+  if (!dutHierarchyFiles.empty())
+    state.oldToNewModuleMap[dut]->setAttr(
+        moduleHierarchyFileAttrName,
+        ArrayAttr::get(&getContext(), dutHierarchyFiles));
+  if (!testHarnessHierarchyFiles.empty())
+    state.oldToNewModuleMap[testHarness]->setAttr(
+        moduleHierarchyFileAttrName,
+        ArrayAttr::get(&getContext(), testHarnessHierarchyFiles));
 
   SmallVector<FirMemory> memories;
   if (getContext().isMultithreadingEnabled()) {
@@ -550,9 +604,14 @@ void FIRRTLModuleLowering::runOnOperation() {
 
   // Now that we've lowered all of the modules, move the bodies over and
   // update any instances that refer to the old modules.
-  mlir::parallelForEachN(
-      &getContext(), 0, modulesToProcess.size(),
-      [&](auto index) { lowerModuleBody(modulesToProcess[index], state); });
+  auto result = mlir::failableParallelForEachN(
+      &getContext(), 0, modulesToProcess.size(), [&](auto index) {
+        return lowerModuleBody(modulesToProcess[index], state);
+      });
+
+  // If any module bodies failed to lower, return early.
+  if (failed(result))
+    return signalPassFailure();
 
   // Move binds from inside modules to outside modules.
   for (auto bind : state.binds) {
@@ -573,6 +632,7 @@ void FIRRTLModuleLowering::runOnOperation() {
 void FIRRTLModuleLowering::lowerMemoryDecls(ArrayRef<FirMemory> mems,
                                             CircuitLoweringState &state) {
   assert(!mems.empty());
+  state.used_RANDOMIZE_MEM_INIT = 1;
   // Insert memories at the bottom of the file.
   OpBuilder b(state.circuitOp);
   b.setInsertionPointAfter(state.circuitOp);
@@ -919,24 +979,8 @@ FIRRTLModuleLowering::lowerModule(FModuleOp oldModule, Block *topLevelModule,
   // Transform module annotations
   AnnotationSet annos(oldModule);
 
-  // Grab output file from circuit-level annotation and lower to an attribute
-  // on the module.
-  auto setModuleHierarchyFileAttr = [&](const char hierAnnoClass[]) {
-    AnnotationSet circuitAnnos(loweringState.circuitOp);
-    if (auto hierAnno = circuitAnnos.getAnnotation(hierAnnoClass))
-      newModule->setAttr(
-          moduleHierarchyFileAttrName,
-          hw::OutputFileAttr::getFromFilename(
-              &getContext(),
-              hierAnno.getMember<StringAttr>("filename").getValue(),
-              /*excludeFromFileList=*/true));
-  };
-  if (annos.removeAnnotation(dutAnnoClass)) {
-    setModuleHierarchyFileAttr(moduleHierAnnoClass);
+  if (annos.removeAnnotation(dutAnnoClass))
     loweringState.setDut(oldModule);
-  }
-  if (loweringState.circuitOp.getMainModule() == oldModule)
-    setModuleHierarchyFileAttr(testHarnessHierAnnoClass);
 
   if (annos.removeAnnotation(verifBBClass))
     newModule->setAttr("firrtl.extract.cover.extra", builder.getUnitAttr());
@@ -1138,13 +1182,14 @@ static SmallVector<SubfieldOp> getAllFieldAccesses(Value structValue,
 /// Now that we have the operations for the hw.module's corresponding to the
 /// firrtl.module's, we can go through and move the bodies over, updating the
 /// ports and instances.
-void FIRRTLModuleLowering::lowerModuleBody(
-    FModuleOp oldModule, CircuitLoweringState &loweringState) {
+LogicalResult
+FIRRTLModuleLowering::lowerModuleBody(FModuleOp oldModule,
+                                      CircuitLoweringState &loweringState) {
   auto newModule =
       dyn_cast_or_null<hw::HWModuleOp>(loweringState.getNewModule(oldModule));
   // Don't touch modules if we failed to lower ports.
   if (!newModule)
-    return;
+    return success();
 
   ImplicitLocOpBuilder bodyBuilder(oldModule.getLoc(), newModule.body());
 
@@ -1233,7 +1278,7 @@ void FIRRTLModuleLowering::lowerModuleBody(
   cursor.erase();
 
   // Lower all of the other operations.
-  lowerModuleOperations(newModule, loweringState);
+  return lowerModuleOperations(newModule, loweringState);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1242,32 +1287,14 @@ void FIRRTLModuleLowering::lowerModuleBody(
 
 namespace {
 
-struct MixedModuleNamespace : Namespace {
-  MixedModuleNamespace() {}
-  MixedModuleNamespace(hw::HWModuleOp module) { add(module); }
-
-  /// Populate the namespace from a module-like operation. This namespace will
-  /// be composed of the `inner_sym`s of the module's ports and declarations.
-  void add(hw::HWModuleOp module) {
-    for (auto port : module.getAllPorts())
-      if (port.sym && !port.sym.getValue().empty())
-        nextIndex.insert({port.sym.getValue(), 0});
-    module.walk([&](Operation *op) {
-      auto attr = op->getAttrOfType<StringAttr>("inner_sym");
-      if (attr)
-        nextIndex.insert({attr.getValue(), 0});
-    });
-  }
-};
-
 struct FIRRTLLowering : public FIRRTLVisitor<FIRRTLLowering, LogicalResult> {
 
   FIRRTLLowering(hw::HWModuleOp module, CircuitLoweringState &circuitState)
       : theModule(module), circuitState(circuitState),
         builder(module.getLoc(), module.getContext()),
-        moduleNamespace(MixedModuleNamespace(module)) {}
+        moduleNamespace(hw::ModuleNamespace(module)) {}
 
-  void run();
+  LogicalResult run();
 
   void optimizeTemporaryWire(sv::WireOp wire);
 
@@ -1509,17 +1536,17 @@ private:
 
   /// A namespace that can be used to generte new symbol names that are unique
   /// within this module.
-  MixedModuleNamespace moduleNamespace;
+  hw::ModuleNamespace moduleNamespace;
 };
 } // end anonymous namespace
 
-void FIRRTLModuleLowering::lowerModuleOperations(
+LogicalResult FIRRTLModuleLowering::lowerModuleOperations(
     hw::HWModuleOp module, CircuitLoweringState &loweringState) {
-  FIRRTLLowering(module, loweringState).run();
+  return FIRRTLLowering(module, loweringState).run();
 }
 
 // This is the main entrypoint for the lowering pass.
-void FIRRTLLowering::run() {
+LogicalResult FIRRTLLowering::run() {
   // FIRRTL FModule is a single block because FIRRTL ops are a DAG.  Walk
   // through each operation, lowering each in turn if we can, introducing
   // casts if we cannot.
@@ -1545,9 +1572,7 @@ void FIRRTLLowering::run() {
         opsToRemove.push_back(&op);
         break;
       case LoweringFailure:
-        // If lowering failed, don't remove *anything* we've lowered so far,
-        // there may be uses, and the pass will fail anyway.
-        opsToRemove.clear();
+        return failure();
       }
     }
   }
@@ -1566,6 +1591,8 @@ void FIRRTLLowering::run() {
   // inserted by MemOp insertions.
   for (auto wire : tmpWiresToOptimize)
     optimizeTemporaryWire(wire);
+
+  return success();
 }
 
 // Try to optimize out temporary wires introduced during lowering.
