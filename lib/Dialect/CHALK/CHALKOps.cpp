@@ -9,8 +9,10 @@
 #include "circt/Dialect/CHALK/CHALKOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 
 using namespace mlir;
 using namespace circt;
@@ -21,13 +23,29 @@ using namespace chalk;
 //===----------------------------------------------------------------------===//
 
 ParseResult CellOp::parse(OpAsmParser &parser, OperationState &result) {
-  auto buildFuncType =
-      [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
-         function_interface_impl::VariadicFlag,
-         std::string &) { return builder.getFunctionType(argTypes, results); };
+  // auto buildFuncType =
+  //     [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+  //        function_interface_impl::VariadicFlag,
+  //        std::string &) { return builder.getFunctionType(argTypes, results); };
 
-  return function_interface_impl::parseFunctionOp(
-      parser, result, /*allowVariadic=*/false, buildFuncType);
+  // return function_interface_impl::parseFunctionOp(
+  //     parser, result, /*allowVariadic=*/false, buildFuncType);
+  using namespace mlir::function_interface_impl;
+
+  auto loc = parser.getCurrentLocation();
+  auto &builder = parser.getBuilder();
+
+  // Parse the name as a symbol.
+  StringAttr nameAttr;
+  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+                             result.attributes))
+    return failure();
+
+  // Parse the optional function body.
+  auto *body = result.addRegion();
+  if (parser.parseRegion(*body))
+    return failure();
+  return success();
 }
 
 void CellOp::print(OpAsmPrinter &p) {
@@ -41,8 +59,8 @@ static LogicalResult verifyCellOp(CellOp op) {
   // if (op.isExternal())
   //   return success();
 
-  if (op.cell_name().empty())
-    return op.emitOpError("Cell must be named");
+  // if (op.cell_name().empty())
+  //   return op.emitOpError("Cell must be named");
 
   // // Verify that the machine only has one block terminated with OutputOp.
   // if (!llvm::hasSingleElement(op))
