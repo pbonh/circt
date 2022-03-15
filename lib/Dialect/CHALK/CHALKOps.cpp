@@ -22,52 +22,52 @@ using namespace chalk;
 // CellOp
 //===----------------------------------------------------------------------===//
 
-ParseResult CellOp::parse(OpAsmParser &parser, OperationState &result) {
-  // auto buildFuncType =
-  //     [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
-  //        function_interface_impl::VariadicFlag,
-  //        std::string &) { return builder.getFunctionType(argTypes, results); };
-
-  // return function_interface_impl::parseFunctionOp(
-  //     parser, result, /*allowVariadic=*/false, buildFuncType);
-  using namespace mlir::function_interface_impl;
-
-  auto loc = parser.getCurrentLocation();
-  auto &builder = parser.getBuilder();
-
-  // Parse the name as a symbol.
-  StringAttr nameAttr;
-  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
-                             result.attributes))
-    return failure();
-
-  // Parse the optional function body.
-  auto *body = result.addRegion();
-  if (parser.parseRegion(*body))
-    return failure();
-  return success();
-}
-
-void CellOp::print(OpAsmPrinter &p) {
-  FunctionType fnType = getType();
-  function_interface_impl::printFunctionOp(
-      p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
-}
-
-static LogicalResult verifyCellOp(CellOp op) {
-  // // If this function is external there is nothing to do.
-  // if (op.isExternal())
-  //   return success();
-
-  // if (op.cell_name().empty())
-  //   return op.emitOpError("Cell must be named");
-
-  // // Verify that the machine only has one block terminated with OutputOp.
-  // if (!llvm::hasSingleElement(op))
-  //   return op.emitOpError("must only have a single block");
-
-  return success();
-}
+// ParseResult CellOp::parse(OpAsmParser &parser, OperationState &result) {
+//   // auto buildFuncType =
+//   //     [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+//   //        function_interface_impl::VariadicFlag,
+//   //        std::string &) { return builder.getFunctionType(argTypes, results); };
+// 
+//   // return function_interface_impl::parseFunctionOp(
+//   //     parser, result, /*allowVariadic=*/false, buildFuncType);
+//   using namespace mlir::function_interface_impl;
+// 
+//   auto loc = parser.getCurrentLocation();
+//   auto &builder = parser.getBuilder();
+// 
+//   // Parse the name as a symbol.
+//   StringAttr nameAttr;
+//   if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+//                              result.attributes))
+//     return failure();
+// 
+//   // Parse the optional function body.
+//   auto *body = result.addRegion();
+//   if (parser.parseRegion(*body))
+//     return failure();
+//   return success();
+// }
+// 
+// void CellOp::print(OpAsmPrinter &p) {
+//   FunctionType fnType = getType();
+//   function_interface_impl::printFunctionOp(
+//       p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+// }
+// 
+// static LogicalResult verifyCellOp(CellOp op) {
+//   // // If this function is external there is nothing to do.
+//   // if (op.isExternal())
+//   //   return success();
+// 
+//   // if (op.cell_name().empty())
+//   //   return op.emitOpError("Cell must be named");
+// 
+//   // // Verify that the machine only has one block terminated with OutputOp.
+//   // if (!llvm::hasSingleElement(op))
+//   //   return op.emitOpError("must only have a single block");
+// 
+//   return success();
+// }
 
 //===----------------------------------------------------------------------===//
 // TableGen generated logic

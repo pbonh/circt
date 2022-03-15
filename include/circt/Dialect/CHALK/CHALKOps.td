@@ -15,10 +15,8 @@ include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 def CellOp : CHALKOp<"cell", [
-    HasParent<"mlir::ModuleOp">,
-    FunctionOpInterface,
-    Symbol,
     IsolatedFromAbove,
+    SingleBlock,
     NoTerminator
   ]> {
   let summary = "Define a 2D VLSI layout";
@@ -27,56 +25,21 @@ def CellOp : CHALKOp<"cell", [
     multiple shapes, paths, or placements.
   }];
 
-  // let arguments = (ins);
   let arguments = (ins StrAttr:$cell_name);
-  // let regions = (region SizedRegion<1>:$body);
-  let regions = (region AnyRegion:$body);
   let results = (outs);
+  let regions = (region VariadicRegion<SizedRegion<1>>:$body);
 
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "StringAttr":$name, "StringAttr":$cell_name)>
-  ];
-
-  let extraClassDeclaration = [{
-    /// Returns the type of this function.
-    FunctionType getType() { 
-      return getTypeAttr().getValue().cast<FunctionType>();
-    }
-
-    /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
-
-    /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
-
-    /// Verify the type attribute of this function. Returns failure and emits
-    /// an error if the attribute is invalid.
-    LogicalResult verifyType() {
-      auto type = getTypeAttr().getValue();
-      if (!type.isa<FunctionType>())
-        return emitOpError("requires '" + getTypeAttrName() +
-                           "' attribute of function type");
-      return success();
-    }
-
-    // Get the module's symbolic name as StringAttr.
-    StringAttr getNameAttr() {
-      return (*this)->getAttrOfType<StringAttr>(
-        ::mlir::SymbolTable::getSymbolAttrName());
-    }
-
-    // Get the module's symbolic name.
-    StringRef getName() {
-      return getNameAttr().getValue();
-    }
-  }];
-
-  let hasCustomAssemblyFormat = 1;
-  let verifier = [{ return ::verify$cppClass(*this); }];
+  let assemblyFormat = "$cell_name attr-dict $body";
 }
 
-def RectangleOp : CHALKOp<"rectangle", [HasParent<"CellOp">]> {
+class CHALKCellShapeBase<string mnemonic, list<Trait> traits = []> :
+    CHALKOp<mnemonic, traits> {
+}
+
+def RectangleOp : CHALKCellShapeBase<"rectangle", [
+    HasParent<"CellOp">,
+    IsolatedFromAbove
+  ]> {
   let summary = "Define a state of a machine";
   let description = [{
     `chalk.rectangle` represents a rectangle in a 2D VLSI layout. It
@@ -84,15 +47,18 @@ def RectangleOp : CHALKOp<"rectangle", [HasParent<"CellOp">]> {
     and width.
   }];
   let arguments = (ins
+    StrAttr: $sym_name,
     I64Attr:$xCoord,
     I64Attr:$yCoord,
     UI64Attr:$width,
     UI64Attr:$height
   );
   let results = (outs);
-  let regions = (region AnyRegion:$body);
+  let regions = (region VariadicRegion<SizedRegion<1>>:$body);
 
-  let assemblyFormat = [{ attr-dict $xCoord `,` $yCoord `,` $width `,` $height regions }];
+  // let assemblyFormat = [{ $sym_name attr-dict $xCoord `,` $yCoord `,` $width `,` $height $body }];
+  // let assemblyFormat = [{ $sym_name `{` attr-dict $xCoord `,` $yCoord `,` $width `,` $height `}` regions }];
+  let assemblyFormat = "$sym_name attr-dict $body";
 }
 
 #endif // CIRCT_DIALECT_CHALK_CHALKOPS_TD
