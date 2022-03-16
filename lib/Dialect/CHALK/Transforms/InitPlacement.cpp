@@ -33,10 +33,7 @@ struct InitPlacementPass : public InitPlacementBase<InitPlacementPass> {
 void InitPlacementPass::runOnOperation() {
     auto cell = getOperation();
     auto *ctx = cell.getContext();
-    if (ctx) {
-        signalPassFailure();
-    }
-    else {
+    if (!ctx) {
         signalPassFailure();
     }
 }

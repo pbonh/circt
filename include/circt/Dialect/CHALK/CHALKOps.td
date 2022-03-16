@@ -38,6 +38,7 @@ class CHALKCellShapeBase<string mnemonic, list<Trait> traits = []> :
 
 def RectangleOp : CHALKCellShapeBase<"rectangle", [
     HasParent<"CellOp">,
+    SingleBlock,
     IsolatedFromAbove
   ]> {
   let summary = "Define a state of a machine";
