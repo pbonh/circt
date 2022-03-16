@@ -15,8 +15,8 @@ include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 def CellOp : CHALKOp<"cell", [
-    IsolatedFromAbove,
     SingleBlock,
+    IsolatedFromAbove,
     NoTerminator
   ]> {
   let summary = "Define a 2D VLSI layout";
@@ -29,7 +29,7 @@ def CellOp : CHALKOp<"cell", [
   let results = (outs);
   let regions = (region VariadicRegion<SizedRegion<1>>:$body);
 
-  let assemblyFormat = "$cell_name attr-dict $body";
+  let assemblyFormat = "$cell_name attr-dict regions";
 }
 
 class CHALKCellShapeBase<string mnemonic, list<Trait> traits = []> :
@@ -39,7 +39,8 @@ class CHALKCellShapeBase<string mnemonic, list<Trait> traits = []> :
 def RectangleOp : CHALKCellShapeBase<"rectangle", [
     HasParent<"CellOp">,
     SingleBlock,
-    IsolatedFromAbove
+    IsolatedFromAbove,
+    NoTerminator
   ]> {
   let summary = "Define a state of a machine";
   let description = [{
