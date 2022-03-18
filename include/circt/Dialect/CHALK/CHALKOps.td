@@ -29,7 +29,7 @@ def CellOp : CHALKOp<"cell", [
   let results = (outs);
   let regions = (region VariadicRegion<SizedRegion<1>>:$body);
 
-  let assemblyFormat = "$cell_name attr-dict regions";
+  let assemblyFormat = "$cell_name attr-dict $body";
 }
 
 class CHALKCellShapeBase<string mnemonic, list<Trait> traits = []> :
@@ -56,11 +56,11 @@ def RectangleOp : CHALKCellShapeBase<"rectangle", [
     UI64Attr:$height
   );
   let results = (outs);
-  let regions = (region VariadicRegion<SizedRegion<1>>:$body);
+  let regions = (region);
 
   // let assemblyFormat = [{ $sym_name attr-dict $xCoord `,` $yCoord `,` $width `,` $height $body }];
   // let assemblyFormat = [{ $sym_name `{` attr-dict $xCoord `,` $yCoord `,` $width `,` $height `}` regions }];
-  let assemblyFormat = "$sym_name attr-dict $body";
+  let assemblyFormat = "$sym_name attr-dict";
 }
 
 #endif // CIRCT_DIALECT_CHALK_CHALKOPS_TD
