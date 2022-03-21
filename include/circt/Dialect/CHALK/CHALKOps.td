@@ -10,7 +10,6 @@
 #define CIRCT_DIALECT_CHALK_CHALKOPS_TD
 
 include "mlir/IR/OpAsmInterface.td"
-include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 

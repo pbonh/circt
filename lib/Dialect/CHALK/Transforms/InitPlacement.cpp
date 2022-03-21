@@ -32,10 +32,18 @@ struct InitPlacementPass : public InitPlacementBase<InitPlacementPass> {
 
 void InitPlacementPass::runOnOperation() {
     auto cell = getOperation();
+    OpBuilder builder(cell);
     auto *ctx = cell.getContext();
     if (!ctx) {
         signalPassFailure();
     }
+
+    // Gather Cell Shapes
+    std::vector<Operation *> ops;
+    llvm::for_each(getOperation().getBody()->getOperations(), [&](Operation &op) {
+        if (isa<RectangleOp>(op))
+            ops.push_back(&op);
+    });
 }
 
 std::unique_ptr<mlir::Pass> circt::chalk::createInitPlacementPass() {
