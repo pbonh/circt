@@ -51,8 +51,8 @@ def RectangleOp : CHALKCellShapeBase<"rectangle", [
     StrAttr: $sym_name,
     I64Attr:$xCoord,
     I64Attr:$yCoord,
-    UI64Attr:$width,
-    UI64Attr:$height
+    UI32Attr:$width,
+    UI32Attr:$height
   );
   let results = (outs);
   let regions = (region);
