@@ -16,7 +16,7 @@
 #include "circt/Dialect/CHALK/CHALKOps.h"
 #include "circt/Dialect/CHALK/CHALKTypes.h"
 #include "circt/Dialect/CHALK/Passes.h"
-#include "mlir/IR/Threading.h"
+#include "mlir/IR/Builders.h"
 #include "llvm/Support/Casting.h"
 
 using namespace circt;
@@ -36,6 +36,7 @@ struct InitPlacementPass : public InitPlacementBase<InitPlacementPass> {
 
 void InitPlacementPass::runOnOperation() {
     auto cell = getOperation();
+    OpBuilder builder(&getContext());
     CellOpList ops;
     llvm::for_each(cell.getBody()->getOperations(), [&](Operation &op) {
         if (isa<RectangleOp>(op)) {
@@ -47,13 +48,13 @@ void InitPlacementPass::runOnOperation() {
     int64_t placeX = 0;
     for (auto *op: ops) {
         RectangleOp rectangle = dyn_cast<RectangleOp>(op);
-        uint64_t prevX = rectangle.xCoord();
-        IntegerAttr placeXAttr;
-        // auto placeXAttr = IntegerAttr::get(&getContext(), placeX);
+        int64_t prevX = rectangle.width();
+        IntegerAttr placeXAttr = builder.getI64IntegerAttr(placeX);
         if (idx != 0) {
             rectangle.xCoordAttr(placeXAttr);
         }
         placeX += prevX;
+        idx++;
     }
 }
 
