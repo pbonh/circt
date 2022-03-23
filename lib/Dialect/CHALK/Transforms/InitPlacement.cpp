@@ -19,14 +19,10 @@
 #include "mlir/IR/Threading.h"
 #include "llvm/Support/Casting.h"
 
-#include <set>
-
 using namespace circt;
 using namespace chalk;
 
 using RectangleList = std::vector< RectangleOp* >;
-using RectangleOverlap = std::pair< size_t, size_t >;
-using RectangleOverlaps = std::set< RectangleOverlap >;
 
 //===----------------------------------------------------------------------===//
 // Pass Infrastructure
