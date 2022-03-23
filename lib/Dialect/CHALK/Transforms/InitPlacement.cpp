@@ -22,7 +22,7 @@
 using namespace circt;
 using namespace chalk;
 
-using RectangleList = std::vector< RectangleOp* >;
+using CellOpList = std::vector< Operation* >;
 
 //===----------------------------------------------------------------------===//
 // Pass Infrastructure
@@ -36,24 +36,22 @@ struct InitPlacementPass : public InitPlacementBase<InitPlacementPass> {
 
 void InitPlacementPass::runOnOperation() {
     auto cell = getOperation();
-    RectangleList rectangles;
+    CellOpList ops;
     llvm::for_each(cell.getBody()->getOperations(), [&](Operation &op) {
         if (isa<RectangleOp>(op)) {
-            auto rectangle = dyn_cast<RectangleOp>(op);
-            if (rectangle) {
-                rectangles.push_back(&rectangle);
-            }
+            ops.push_back(&op);
         }
     });
 
     size_t idx = 0;
     int64_t placeX = 0;
-    for (auto *rect: rectangles) {
-        uint64_t prevX = rect->xCoord();
+    for (auto *op: ops) {
+        RectangleOp rectangle = dyn_cast<RectangleOp>(op);
+        uint64_t prevX = rectangle.xCoord();
         IntegerAttr placeXAttr;
         // auto placeXAttr = IntegerAttr::get(&getContext(), placeX);
         if (idx != 0) {
-            rect->xCoordAttr(placeXAttr);
+            rectangle.xCoordAttr(placeXAttr);
         }
         placeX += prevX;
     }
