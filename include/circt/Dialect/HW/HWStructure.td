@@ -129,29 +129,32 @@ def HWModuleOp : HWModuleOpBase<"module",
                                   mlir::OpAsmSetValueNameFn setNameFn);
 
     /// Returns the type of this function.
-    FunctionType getType() { 
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getFunctionTypeAttr().getValue().cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Verify the type attribute of this function. Returns failure and emits
     /// an error if the attribute is invalid.
     LogicalResult verifyType() {
-      auto type = getTypeAttr().getValue();
+      auto type = getFunctionTypeAttr().getValue();
       if (!type.isa<FunctionType>())
         return emitOpError("requires '" + getTypeAttrName() +
                            "' attribute of function type");
       return success();
     }
+
+    /// Verifies the body of the function.
+    LogicalResult verifyBody();
   }];
 
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def HWModuleExternOp : HWModuleOpBase<"module.extern",
@@ -233,20 +236,20 @@ def HWModuleExternOp : HWModuleOpBase<"module.extern",
                                   mlir::OpAsmSetValueNameFn setNameFn);
 
     /// Returns the type of this function.
-    FunctionType getType() { 
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getFunctionTypeAttr().getValue().cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Verify the type attribute of this function. Returns failure and emits
     /// an error if the attribute is invalid.
     LogicalResult verifyType() {
-      auto type = getTypeAttr().getValue();
+      auto type = getFunctionTypeAttr().getValue();
       if (!type.isa<FunctionType>())
         return emitOpError("requires '" + getTypeAttrName() +
                            "' attribute of function type");
@@ -255,7 +258,7 @@ def HWModuleExternOp : HWModuleOpBase<"module.extern",
   }];
 
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def HWGeneratorSchemaOp : HWOp<"generator.schema",
@@ -345,29 +348,31 @@ def HWModuleGeneratedOp : HWModuleOpBase<"module.generated",
                                   mlir::OpAsmSetValueNameFn setNameFn);
 
     /// Returns the type of this function.
-    FunctionType getType() { 
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getFunctionTypeAttr().getValue().cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Verify the type attribute of this function. Returns failure and emits
     /// an error if the attribute is invalid.
     LogicalResult verifyType() {
-      auto type = getTypeAttr().getValue();
+      auto type = getFunctionTypeAttr().getValue();
       if (!type.isa<FunctionType>())
         return emitOpError("requires '" + getTypeAttrName() +
                            "' attribute of function type");
       return success();
     }
+
+    TypeAttr getTypeAttr();
   }];
 
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def InstanceOp : HWOp<"instance", [
@@ -378,7 +383,7 @@ def InstanceOp : HWOp<"instance", [
     This represents an instance of a module. The inputs and results are
     the referenced module's inputs and outputs.  The `argNames` and
     `resultNames` attributes must match the referenced module.
-    
+
     Any parameters in the "old" format (slated to be removed) are stored in the
     `oldParameters` dictionary.
   }];
@@ -446,8 +451,6 @@ def InstanceOp : HWOp<"instance", [
       instanceNameAttr(name);
     }
 
-    LogicalResult verifyCustom();
-
     //===------------------------------------------------------------------===//
     // SymbolOpInterface Methods
     //===------------------------------------------------------------------===//
@@ -457,7 +460,7 @@ def InstanceOp : HWOp<"instance", [
   }];
 
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return this->verifyCustom();";
+  let hasVerifier = 1;
 }
 
 def OutputOp : HWOp<"output", [Terminator, HasParent<"HWModuleOp">,
@@ -476,10 +479,12 @@ def OutputOp : HWOp<"output", [Terminator, HasParent<"HWModuleOp">,
 
   let assemblyFormat = "attr-dict ($operands^ `:` qualified(type($operands)))?";
 
-  let verifier = "return ::verifyOutputOp(this);";
+  let hasVerifier = 1;
 }
 
-def GlobalRefOp : HWOp<"globalRef", [IsolatedFromAbove, Symbol]> {
+def GlobalRefOp : HWOp<"globalRef", [
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    IsolatedFromAbove, Symbol]> {
   let summary = "A global reference to uniquely identify each"
                                     "instance of an operation";
   let description = [{
@@ -489,15 +494,9 @@ def GlobalRefOp : HWOp<"globalRef", [IsolatedFromAbove, Symbol]> {
     This also lets components of the path point to a common entity.
   }];
 
-  let extraClassDeclaration = [{
-    LogicalResult verifyGlobalRef();
-  }];
-
   let arguments = (ins SymbolNameAttr:$sym_name, NameRefArrayAttr:$namepath);
 
-  let assemblyFormat = [{ $sym_name $namepath attr-dict}];
-
-  let verifier = "return this->verifyGlobalRef();";
+  let assemblyFormat = [{ $sym_name $namepath attr-dict }];
 }
 
 def ProbeOp : HWOp<"probe", []> {
@@ -515,4 +514,3 @@ def ProbeOp : HWOp<"probe", []> {
   let assemblyFormat = "$inner_sym attr-dict (`,` $operands^ `:` qualified(type($operands)))?";
 
 }
-

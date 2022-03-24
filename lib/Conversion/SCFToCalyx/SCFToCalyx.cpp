@@ -1091,6 +1091,12 @@ LogicalResult BuildOpGroups::buildOp(PatternRewriter &rewriter,
       /*out=*/remPipe.out_remainder());
 }
 
+// Returns the bit width for the given dimension. This will always be greater
+// than zero. See: https://github.com/llvm/circt/issues/2660
+static unsigned handleZeroWidth(int64_t dim) {
+  return std::max(llvm::Log2_64_Ceil(dim), 1U);
+}
+
 template <typename TAllocOp>
 static LogicalResult buildAllocOp(ComponentLoweringState &componentState,
                                   PatternRewriter &rewriter, TAllocOp allocOp) {
@@ -1100,7 +1106,7 @@ static LogicalResult buildAllocOp(ComponentLoweringState &componentState,
   SmallVector<int64_t> sizes;
   for (int64_t dim : memtype.getShape()) {
     sizes.push_back(dim);
-    addrSizes.push_back(llvm::Log2_64_Ceil(dim));
+    addrSizes.push_back(handleZeroWidth(dim));
   }
   auto memoryOp = rewriter.create<calyx::MemoryOp>(
       allocOp.getLoc(), componentState.getUniqueName("mem"),
@@ -1493,7 +1499,7 @@ appendPortsForExternalMemref(PatternRewriter &rewriter, StringRef memName,
   for (auto dim : enumerate(memrefType.getShape())) {
     outPorts.push_back(calyx::PortInfo{
         rewriter.getStringAttr(memName + "_addr" + std::to_string(dim.index())),
-        rewriter.getIntegerType(llvm::Log2_64_Ceil(dim.value())),
+        rewriter.getIntegerType(handleZeroWidth(dim.value())),
         calyx::Direction::Output,
         DictionaryAttr::get(rewriter.getContext(),
                             {getMemoryInterfaceAttr("addr", dim.index())})});
@@ -1533,7 +1539,7 @@ struct FuncOpConversion : public FuncOpPartialLoweringPattern {
     /// Create I/O ports. Maintain separate in/out port vectors to determine
     /// which port index each function argument will eventually map to.
     SmallVector<calyx::PortInfo> inPorts, outPorts;
-    FunctionType funcType = funcOp.getType();
+    FunctionType funcType = funcOp.getFunctionType();
     unsigned extMemCounter = 0;
     for (auto &arg : enumerate(funcOp.getArguments())) {
       if (arg.value().getType().isa<MemRefType>()) {
@@ -1571,7 +1577,7 @@ struct FuncOpConversion : public FuncOpPartialLoweringPattern {
 
     /// Create a calyx::ComponentOp corresponding to the to-be-lowered function.
     auto compOp = rewriter.create<calyx::ComponentOp>(
-        funcOp.getLoc(), rewriter.getStringAttr(funcOp.sym_name()), ports);
+        funcOp.getLoc(), rewriter.getStringAttr(funcOp.getSymName()), ports);
 
     /// Mark this component as the toplevel.
     compOp->setAttr("toplevel", rewriter.getUnitAttr());
@@ -1943,7 +1949,7 @@ class BuildReturnRegs : public FuncOpPartialLoweringPattern {
   PartiallyLowerFuncToComp(mlir::FuncOp funcOp,
                            PatternRewriter &rewriter) const override {
 
-    for (auto argType : enumerate(funcOp.getType().getResults())) {
+    for (auto argType : enumerate(funcOp.getResultTypes())) {
       auto convArgType = convIndexType(rewriter, argType.value());
       assert(convArgType.isa<IntegerType>() && "unsupported return type");
       unsigned width = convArgType.getIntOrFloatBitWidth();
@@ -2453,7 +2459,7 @@ public:
       /// a single function, else, throw error.
       auto funcOps = moduleOp.getOps<mlir::FuncOp>();
       if (std::distance(funcOps.begin(), funcOps.end()) == 1)
-        topLevelFunction = (*funcOps.begin()).sym_name().str();
+        topLevelFunction = (*funcOps.begin()).getSymName().str();
       else {
         moduleOp.emitError()
             << "Module contains multiple functions, but no top level "
@@ -2502,7 +2508,7 @@ public:
     target.addLegalOp<AddIOp, SubIOp, CmpIOp, ShLIOp, ShRUIOp, ShRSIOp, AndIOp,
                       XOrIOp, OrIOp, ExtUIOp, TruncIOp, CondBranchOp, BranchOp,
                       MulIOp, DivUIOp, RemUIOp, ReturnOp, arith::ConstantOp,
-                      IndexCastOp>();
+                      IndexCastOp, mlir::FuncOp>();
 
     RewritePatternSet legalizePatterns(&getContext());
     legalizePatterns.add<DummyPattern>(&getContext());

@@ -1636,10 +1636,11 @@ private:
 void FIRStmtParser::emitInvalidate(Value val, Flow flow) {
   auto tpe = val.getType().cast<FIRRTLType>();
 
-  if (tpe.isPassive()) {
-    if (flow == Flow::Source || tpe.isa<AnalogType>())
+  auto props = tpe.getRecursiveTypeProperties();
+  if (props.isPassive && !props.containsAnalog) {
+    if (flow == Flow::Source)
       return;
-    if (tpe.hasUninferredWidth())
+    if (props.hasUninferredWidth)
       builder.create<ConnectOp>(val, builder.create<InvalidValueOp>(tpe));
     else
       builder.create<StrictConnectOp>(val, builder.create<InvalidValueOp>(tpe));
@@ -3038,8 +3039,14 @@ ParseResult FIRStmtParser::parseMem(unsigned memIndent) {
                             ports, moduleContext.targetsInModule);
 
     auto sym = getSymbolIfRequired(annotations.first, id);
+    // Port annotations are an ArrayAttr of ArrayAttrs, so iterate over all the
+    // annotations for each port, and check if any of the port needs a symbol.
     if (!sym)
-      sym = getSymbolIfRequired(annotations.second, id);
+      for (auto portAnno : annotations.second.getAsRange<ArrayAttr>()) {
+        sym = getSymbolIfRequired(portAnno, id);
+        if (sym)
+          break;
+      }
     result =
         builder.create<MemOp>(resultTypes, readLatency, writeLatency, depth,
                               ruw, builder.getArrayAttr(resultNames), id,

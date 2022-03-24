@@ -161,21 +161,6 @@ void OutputFileAttr::print(AsmPrinter &p) const {
 // FileListAttr
 //===----------------------------------------------------------------------===//
 
-/// Option         ::= 'includeReplicatedOp'
-/// OutputFileAttr ::= 'output_file<' name (',' Option)* '>'
-Attribute FileListAttr::parse(AsmParser &p, Type type) {
-  StringAttr filename;
-  if (p.parseLess() || p.parseAttribute<StringAttr>(filename) ||
-      p.parseGreater())
-    return Attribute();
-  auto *context = p.getContext();
-  return FileListAttr::get(context, filename);
-}
-
-void FileListAttr::print(AsmPrinter &p) const {
-  p << "<" << getFilename() << ">";
-}
-
 FileListAttr FileListAttr::getFromFilename(MLIRContext *context,
                                            const Twine &filename) {
   auto canonicalized = canonicalizeFilename("", filename);
@@ -218,24 +203,6 @@ InnerRefAttr InnerRefAttr::getFromOperation(mlir::Operation *op,
     op->setAttr(attrName, attr);
   }
   return InnerRefAttr::get(moduleName, attr);
-}
-
-//===----------------------------------------------------------------------===//
-// GlobalRefAttr
-//===----------------------------------------------------------------------===//
-
-Attribute GlobalRefAttr::parse(AsmParser &p, Type type) {
-  FlatSymbolRefAttr attr;
-  if (p.parseLess() || p.parseAttribute<FlatSymbolRefAttr>(attr) ||
-      p.parseGreater())
-    return Attribute();
-  return GlobalRefAttr::get(p.getContext(), attr);
-}
-
-void GlobalRefAttr::print(AsmPrinter &p) const {
-  p << "<";
-  p.printSymbolName(getGlblSym().getValue());
-  p << ">";
 }
 
 //===----------------------------------------------------------------------===//
@@ -300,6 +267,17 @@ static Attribute foldBinaryOp(
     if (auto rhs = operands[1].dyn_cast<IntegerAttr>())
       return IntegerAttr::get(lhs.getType(),
                               calculate(lhs.getValue(), rhs.getValue()));
+  return {};
+}
+
+/// Given a unary function, if the operand is a known constant integer,
+/// use the specified fold function to compute the result.
+static Attribute
+foldUnaryOp(ArrayRef<Attribute> operands,
+            llvm::function_ref<APInt(const APInt &)> calculate) {
+  assert(operands.size() == 1 && "unary operator always has one operand");
+  if (auto intAttr = operands[0].dyn_cast<IntegerAttr>())
+    return IntegerAttr::get(intAttr.getType(), calculate(intAttr.getValue()));
   return {};
 }
 
@@ -609,6 +587,14 @@ static Attribute simplifyModS(SmallVector<Attribute, 4> &operands) {
   return foldBinaryOp(operands, [](auto a, auto b) { return a.srem(b); });
 }
 
+static Attribute simplifyCLog2(SmallVector<Attribute, 4> &operands) {
+  assert(isHWIntegerType(operands[0].getType()));
+  return foldUnaryOp(operands, [](auto a) {
+    // Following the Verilog spec, clog2(0) is 0
+    return APInt(a.getBitWidth(), a == 0 ? 0 : a.ceilLogBase2());
+  });
+}
+
 /// Build a parameter expression.  This automatically canonicalizes and
 /// folds, so it may not necessarily return a ParamExprAttr.
 Attribute ParamExprAttr::get(PEO opcode, ArrayRef<Attribute> operandsIn) {
@@ -658,6 +644,9 @@ Attribute ParamExprAttr::get(PEO opcode, ArrayRef<Attribute> operandsIn) {
     break;
   case PEO::ModS:
     result = simplifyModS(operands);
+    break;
+  case PEO::CLog2:
+    result = simplifyCLog2(operands);
     break;
   }
 

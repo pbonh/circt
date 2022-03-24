@@ -145,7 +145,7 @@ InstanceOp::verifySignatureMatch(const hw::ModulePortInfo &ports) {
 /// Consider adding a `HasModulePorts` op interface to facilitate.
 hw::ModulePortInfo MSFTModuleOp::getPorts() {
   SmallVector<hw::PortInfo> inputs, outputs;
-  auto argTypes = getType().getInputs();
+  auto argTypes = getArgumentTypes();
 
   auto argNames = this->argNames();
   for (unsigned i = 0, e = argTypes.size(); i < e; ++i) {
@@ -163,7 +163,7 @@ hw::ModulePortInfo MSFTModuleOp::getPorts() {
   }
 
   auto resultNames = this->resultNames();
-  auto resultTypes = getType().getResults();
+  auto resultTypes = getResultTypes();
   for (unsigned i = 0, e = resultTypes.size(); i < e; ++i) {
     outputs.push_back({resultNames[i].cast<StringAttr>(),
                        hw::PortDirection::OUTPUT, resultTypes[i], i});
@@ -175,12 +175,11 @@ SmallVector<BlockArgument>
 MSFTModuleOp::addPorts(ArrayRef<std::pair<StringAttr, Type>> inputs,
                        ArrayRef<std::pair<StringAttr, Value>> outputs) {
   auto *ctxt = getContext();
-  FunctionType ftype = getType();
   Block *body = getBodyBlock();
 
   // Append new inputs.
-  SmallVector<Type, 32> modifiedArgs(ftype.getInputs().begin(),
-                                     ftype.getInputs().end());
+  SmallVector<Type, 32> modifiedArgs(getArgumentTypes().begin(),
+                                     getArgumentTypes().end());
   SmallVector<Attribute> modifiedArgNames(argNames().getAsRange<Attribute>());
   SmallVector<BlockArgument> newBlockArgs;
   for (auto ttPair : inputs) {
@@ -192,8 +191,8 @@ MSFTModuleOp::addPorts(ArrayRef<std::pair<StringAttr, Type>> inputs,
   argNamesAttr(ArrayAttr::get(ctxt, modifiedArgNames));
 
   // Append new outputs.
-  SmallVector<Type, 32> modifiedResults(ftype.getResults().begin(),
-                                        ftype.getResults().end());
+  SmallVector<Type, 32> modifiedResults(getResultTypes().begin(),
+                                        getResultTypes().end());
   SmallVector<Attribute> modifiedResultNames(
       resultNames().getAsRange<Attribute>());
   Operation *terminator = body->getTerminator();
@@ -215,7 +214,7 @@ MSFTModuleOp::addPorts(ArrayRef<std::pair<StringAttr, Type>> inputs,
 SmallVector<unsigned> MSFTModuleOp::removePorts(llvm::BitVector inputs,
                                                 llvm::BitVector outputs) {
   MLIRContext *ctxt = getContext();
-  FunctionType ftype = getType();
+  FunctionType ftype = getFunctionType();
   Block *body = getBodyBlock();
   Operation *terminator = body->getTerminator();
 
@@ -460,9 +459,8 @@ ParseResult MSFTModuleOp::parse(OpAsmParser &parser, OperationState &result) {
 void MSFTModuleOp::print(OpAsmPrinter &p) {
   using namespace mlir::function_interface_impl;
 
-  FunctionType fnType = getType();
-  auto argTypes = fnType.getInputs();
-  auto resultTypes = fnType.getResults();
+  auto argTypes = getArgumentTypes();
+  auto resultTypes = getResultTypes();
 
   // Print the operation and the function name.
   p << ' ';
@@ -732,27 +730,27 @@ void MSFTModuleExternOp::print(OpAsmPrinter &p) {
                           omittedAttrs);
 }
 
-static LogicalResult verifyMSFTModuleExternOp(MSFTModuleExternOp module) {
+LogicalResult MSFTModuleExternOp::verify() {
   using namespace mlir::function_interface_impl;
-  auto typeAttr = module->getAttrOfType<TypeAttr>(getTypeAttrName());
+  auto typeAttr = (*this)->getAttrOfType<TypeAttr>(getTypeAttrName());
   auto moduleType = typeAttr.getValue().cast<FunctionType>();
-  auto argNames = module->getAttrOfType<ArrayAttr>("argNames");
-  auto resultNames = module->getAttrOfType<ArrayAttr>("resultNames");
+  auto argNames = (*this)->getAttrOfType<ArrayAttr>("argNames");
+  auto resultNames = (*this)->getAttrOfType<ArrayAttr>("resultNames");
   if (argNames.size() != moduleType.getNumInputs())
-    return module->emitOpError("incorrect number of argument names");
+    return emitOpError("incorrect number of argument names");
   if (resultNames.size() != moduleType.getNumResults())
-    return module->emitOpError("incorrect number of result names");
+    return emitOpError("incorrect number of result names");
 
   SmallPtrSet<Attribute, 4> paramNames;
 
   // Check parameter default values are sensible.
-  for (auto param : module->getAttrOfType<ArrayAttr>("parameters")) {
+  for (auto param : (*this)->getAttrOfType<ArrayAttr>("parameters")) {
     auto paramAttr = param.cast<hw::ParamDeclAttr>();
 
     // Check that we don't have any redundant parameter names.  These are
     // resolved by string name: reuse of the same name would cause ambiguities.
     if (!paramNames.insert(paramAttr.getName()).second)
-      return module->emitOpError("parameter ")
+      return emitOpError("parameter ")
              << paramAttr << " has the same name as a previous parameter";
 
     // Default values are allowed to be missing, check them if present.
@@ -761,15 +759,14 @@ static LogicalResult verifyMSFTModuleExternOp(MSFTModuleExternOp module) {
       continue;
 
     if (value.getType() != paramAttr.getType().getValue())
-      return module->emitOpError("parameter ")
-             << paramAttr << " should have type "
-             << paramAttr.getType().getValue() << "; has type "
-             << value.getType();
+      return emitOpError("parameter ") << paramAttr << " should have type "
+                                       << paramAttr.getType().getValue()
+                                       << "; has type " << value.getType();
 
     // Verify that this is a valid parameter value, disallowing parameter
     // references.  We could allow parameters to refer to each other in the
     // future with lexical ordering if there is a need.
-    if (failed(checkParameterInContext(value, module, module,
+    if (failed(checkParameterInContext(value, *this, *this,
                                        /*disallowParamRefs=*/true)))
       return failure();
   }

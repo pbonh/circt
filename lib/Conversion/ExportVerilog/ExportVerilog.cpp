@@ -1271,6 +1271,7 @@ ModuleEmitter::printParamValue(Attribute value, raw_ostream &os,
   StringRef operatorStr;
   VerilogPrecedence subprecedence = ForceEmitMultiUse;
   Optional<SubExprSignResult> operandSign;
+  bool isUnary = false;
 
   switch (expr.getOpcode()) {
   case PEO::Add:
@@ -1328,6 +1329,11 @@ ModuleEmitter::printParamValue(Attribute value, raw_ostream &os,
     subprecedence = Multiply;
     operandSign = IsSigned;
     break;
+  case PEO::CLog2:
+    operatorStr = "$clog2";
+    operandSign = IsUnsigned;
+    isUnary = true;
+    break;
   }
 
   // Emit the specified operand with a $signed() or $unsigned() wrapper around
@@ -1346,6 +1352,9 @@ ModuleEmitter::printParamValue(Attribute value, raw_ostream &os,
     }
     return signedness == IsSigned;
   };
+
+  if (isUnary)
+    os << operatorStr;
 
   if (subprecedence > parenthesizeIfLooserThan)
     os << '(';
@@ -2454,7 +2463,7 @@ private:
   LogicalResult visitSV(AlwaysCombOp op);
   LogicalResult visitSV(AlwaysFFOp op);
   LogicalResult visitSV(InitialOp op);
-  LogicalResult visitSV(CaseZOp op);
+  LogicalResult visitSV(CaseOp op);
   LogicalResult visitSV(FWriteOp op);
   LogicalResult visitSV(VerbatimOp op);
 
@@ -3263,11 +3272,22 @@ LogicalResult StmtEmitter::visitSV(InitialOp op) {
   return success();
 }
 
-LogicalResult StmtEmitter::visitSV(CaseZOp op) {
+LogicalResult StmtEmitter::visitSV(CaseOp op) {
   SmallPtrSet<Operation *, 8> ops, emptyOps;
   ops.insert(op);
-
-  indent() << "casez (";
+  const char *opname = nullptr;
+  switch (op.caseStyle()) {
+  case CaseStmtType::CaseStmt:
+    opname = "case";
+    break;
+  case CaseStmtType::CaseXStmt:
+    opname = "casex";
+    break;
+  case CaseStmtType::CaseZStmt:
+    opname = "casez";
+    break;
+  }
+  indent() << opname << " (";
   emitExpression(op.cond(), ops);
   os << ')';
   emitLocationInfoAndNewLine(ops);

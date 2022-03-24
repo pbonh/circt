@@ -52,22 +52,19 @@ def LLHD_EntityOp : LLHD_Op<"entity", [
   let arguments = (ins I64Attr: $ins);
   let regions = (region SizedRegion<1>: $body);
 
-  let verifier = [{ return ::verify(*this); }];
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     /// Returns the type of this function.
-    FunctionType getType() { 
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getFunctionTypeAttr().getValue().cast<FunctionType>();
     }
 
-    // Use FunctionOpInterface traits's getBody method.
-    using mlir::detail::FunctionOpInterfaceTrait<EntityOp>::getBody;
-
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Verify the type attribute of this function. Returns failure and emits
     /// an error if the attribute is invalid.
@@ -76,6 +73,10 @@ def LLHD_EntityOp : LLHD_Op<"entity", [
     /// Verifies the body of the function.
     LogicalResult verifyBody();
 
+    // Use FunctionOpInterface traits's getBody method.
+    using mlir::detail::FunctionOpInterfaceTrait<EntityOp>::getBody;
+
+    /// Return the block corresponding to the region.
     Block *getBodyBlock() { return &body().front(); }
   }];
 }
@@ -129,15 +130,15 @@ def LLHD_ProcOp : LLHD_Op<"proc", [
 
   let extraClassDeclaration = [{
     /// Returns the type of this function.
-    FunctionType getType() { 
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getFunctionTypeAttr().getValue().cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Verify the type attribute of this function. Returns failure and emits
     /// an error if the attribute is invalid.
@@ -147,7 +148,7 @@ def LLHD_ProcOp : LLHD_Op<"proc", [
     LogicalResult verifyBody();
   }];
 
-  let verifier = [{ return ::verify(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -211,7 +212,7 @@ def LLHD_InstOp : LLHD_Op<"inst", [
     }
   }];
 
-  let verifier = [{ return ::verify(*this); }];
+  let hasVerifier = 1;
 }
 
 def LLHD_ConnectOp : LLHD_Op<"con", [

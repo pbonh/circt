@@ -175,10 +175,10 @@ void ConstantXOp::getAsmResultNames(
   setNameFn(getResult(), specialName.str());
 }
 
-static LogicalResult verifyConstantXOp(ConstantXOp op) {
+LogicalResult ConstantXOp::verify() {
   // We don't allow zero width constant or unknown width.
-  if (op.getWidth() <= 0)
-    return op.emitError("unsupported type");
+  if (getWidth() <= 0)
+    return emitError("unsupported type");
   return success();
 }
 
@@ -190,10 +190,10 @@ void ConstantZOp::getAsmResultNames(
   setNameFn(getResult(), specialName.str());
 }
 
-static LogicalResult verifyConstantZOp(ConstantZOp op) {
+LogicalResult ConstantZOp::verify() {
   // We don't allow zero width constant or unknown type.
-  if (op.getWidth() <= 0)
-    return op.emitError("unsupported type");
+  if (getWidth() <= 0)
+    return emitError("unsupported type");
   return success();
 }
 
@@ -208,10 +208,10 @@ void LocalParamOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
     setNameFn(getResult(), nameAttr.getValue());
 }
 
-static LogicalResult verifyLocalParamOp(LocalParamOp op) {
+LogicalResult LocalParamOp::verify() {
   // Verify that this is a valid parameter value.
-  return hw::checkParameterInContext(op.value(),
-                                     op->getParentOfType<hw::HWModuleOp>(), op);
+  return hw::checkParameterInContext(
+      value(), (*this)->getParentOfType<hw::HWModuleOp>(), *this);
 }
 
 //===----------------------------------------------------------------------===//
@@ -420,9 +420,9 @@ void AlwaysOp::build(OpBuilder &builder, OperationState &result,
 }
 
 /// Ensure that the symbol being instantiated exists and is an InterfaceOp.
-static LogicalResult verifyAlwaysOp(AlwaysOp op) {
-  if (op.events().size() != op.getNumOperands())
-    return op.emitError("different number of operands and events");
+LogicalResult AlwaysOp::verify() {
+  if (events().size() != getNumOperands())
+    return emitError("different number of operands and events");
   return success();
 }
 
@@ -559,56 +559,55 @@ void InitialOp::build(OpBuilder &builder, OperationState &result,
 /// Return the letter for the specified pattern bit, e.g. "0", "1", "?" or "x".
 /// isVerilog indicates whether we should use "?" (verilog syntax) or "x" (mlir
 /// operation syntax.
-char sv::getLetter(CaseZPatternBit bit, bool isVerilog) {
+char sv::getLetter(CasePatternBit bit, bool isVerilog) {
   switch (bit) {
-  case CaseZPatternBit::Zero:
+  case CasePatternBit::Zero:
     return '0';
-  case CaseZPatternBit::One:
+  case CasePatternBit::One:
     return '1';
-  case CaseZPatternBit::Any:
+  case CasePatternBit::Any:
     return isVerilog ? '?' : 'x';
   }
   llvm_unreachable("invalid casez PatternBit");
 }
 
 /// Return the specified bit, bit 0 is the least significant bit.
-auto CaseZPattern::getBit(size_t bitNumber) const -> CaseZPatternBit {
-  return CaseZPatternBit(unsigned(attr.getValue()[bitNumber * 2]) +
-                         2 * unsigned(attr.getValue()[bitNumber * 2 + 1]));
+auto CasePattern::getBit(size_t bitNumber) const -> CasePatternBit {
+  return CasePatternBit(unsigned(attr.getValue()[bitNumber * 2]) +
+                        2 * unsigned(attr.getValue()[bitNumber * 2 + 1]));
 }
 
-bool CaseZPattern::isDefault() const {
+bool CasePattern::isDefault() const {
   for (size_t i = 0, e = getWidth(); i != e; ++i)
-    if (getBit(i) != CaseZPatternBit::Any)
+    if (getBit(i) != CasePatternBit::Any)
       return false;
   return true;
 }
 
-static SmallVector<CaseZPatternBit> getPatternBitsForValue(const APInt &value) {
-  SmallVector<CaseZPatternBit> result;
+static SmallVector<CasePatternBit> getPatternBitsForValue(const APInt &value) {
+  SmallVector<CasePatternBit> result;
   result.reserve(value.getBitWidth());
   for (size_t i = 0, e = value.getBitWidth(); i != e; ++i)
-    result.push_back(CaseZPatternBit(value[i]));
+    result.push_back(CasePatternBit(value[i]));
 
   return result;
 }
 
-// Get a CaseZPattern from a specified list of PatternBits.  Bits are
+// Get a CasePattern from a specified list of PatternBits.  Bits are
 // specified in most least significant order - element zero is the least
 // significant bit.
-CaseZPattern::CaseZPattern(const APInt &value, MLIRContext *context)
-    : CaseZPattern(getPatternBitsForValue(value), context) {}
+CasePattern::CasePattern(const APInt &value, MLIRContext *context)
+    : CasePattern(getPatternBitsForValue(value), context) {}
 
-CaseZPattern CaseZPattern::getDefault(unsigned width, MLIRContext *context) {
-  return CaseZPattern(SmallVector<CaseZPatternBit>(width, CaseZPatternBit::Any),
-                      context);
+CasePattern CasePattern::getDefault(unsigned width, MLIRContext *context) {
+  return CasePattern(SmallVector<CasePatternBit>(width, CasePatternBit::Any),
+                     context);
 }
 
-// Get a CaseZPattern from a specified list of PatternBits.  Bits are
+// Get a CasePattern from a specified list of PatternBits.  Bits are
 // specified in most least significant order - element zero is the least
 // significant bit.
-CaseZPattern::CaseZPattern(ArrayRef<CaseZPatternBit> bits,
-                           MLIRContext *context) {
+CasePattern::CasePattern(ArrayRef<CasePatternBit> bits, MLIRContext *context) {
   APInt pattern(bits.size() * 2, 0);
   for (auto elt : llvm::reverse(bits)) {
     pattern <<= 2;
@@ -618,26 +617,36 @@ CaseZPattern::CaseZPattern(ArrayRef<CaseZPatternBit> bits,
   attr = IntegerAttr::get(patternType, pattern);
 }
 
-auto CaseZOp::getCases() -> SmallVector<CaseZInfo, 4> {
-  SmallVector<CaseZInfo, 4> result;
+auto CaseOp::getCases() -> SmallVector<CaseInfo, 4> {
+  SmallVector<CaseInfo, 4> result;
   assert(casePatterns().size() == getNumRegions() &&
          "case pattern / region count mismatch");
   size_t nextRegion = 0;
   for (auto elt : casePatterns()) {
-    result.push_back({CaseZPattern(elt.cast<IntegerAttr>()),
+    result.push_back({CasePattern(elt.cast<IntegerAttr>()),
                       &getRegion(nextRegion++).front()});
   }
 
   return result;
 }
 
-ParseResult CaseZOp::parse(OpAsmParser &parser, OperationState &result) {
+ParseResult CaseOp::parse(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
 
   OpAsmParser::OperandType condOperand;
   Type condType;
 
   auto loc = parser.getCurrentLocation();
+
+  StringRef keyword;
+  if (!parser.parseOptionalKeyword(&keyword)) {
+    auto kind = symbolizeCaseStmtType(keyword);
+    if (!kind.hasValue())
+      return parser.emitError(loc, "expected 'case', 'casex', or 'casez'");
+    auto caseEnum = static_cast<int32_t>(kind.getValue());
+    result.addAttribute("caseStyle", builder.getI32IntegerAttr(caseEnum));
+  }
+
   if (parser.parseOperand(condOperand) || parser.parseColonType(condType) ||
       parser.parseOptionalAttrDict(result.attributes) ||
       parser.resolveOperand(condOperand, condType, result.operands))
@@ -650,11 +659,11 @@ ParseResult CaseZOp::parse(OpAsmParser &parser, OperationState &result) {
 
   // Parse all the cases.
   SmallVector<Attribute> casePatterns;
-  SmallVector<CaseZPatternBit, 16> caseBits;
+  SmallVector<CasePatternBit, 16> caseBits;
   while (1) {
     if (succeeded(parser.parseOptionalKeyword("default"))) {
       // Fill the pattern with Any.
-      caseBits.assign(condWidth, CaseZPatternBit::Any);
+      caseBits.assign(condWidth, CasePatternBit::Any);
     } else if (failed(parser.parseOptionalKeyword("case"))) {
       // Not default or case, must be the end of the cases.
       break;
@@ -671,16 +680,16 @@ ParseResult CaseZOp::parse(OpAsmParser &parser, OperationState &result) {
 
       // Parse and decode each bit, we reverse the list later for MSB->LSB.
       for (; !caseVal.empty(); caseVal = caseVal.drop_front()) {
-        CaseZPatternBit bit;
+        CasePatternBit bit;
         switch (caseVal.front()) {
         case '0':
-          bit = CaseZPatternBit::Zero;
+          bit = CasePatternBit::Zero;
           break;
         case '1':
-          bit = CaseZPatternBit::One;
+          bit = CasePatternBit::One;
           break;
         case 'x':
-          bit = CaseZPatternBit::Any;
+          bit = CasePatternBit::Any;
           break;
         default:
           return parser.emitError(loc, "unexpected case bit '")
@@ -695,10 +704,10 @@ ParseResult CaseZOp::parse(OpAsmParser &parser, OperationState &result) {
 
       // High zeros may be missing.
       if (caseBits.size() < condWidth)
-        caseBits.append(condWidth - caseBits.size(), CaseZPatternBit::Zero);
+        caseBits.append(condWidth - caseBits.size(), CasePatternBit::Zero);
     }
 
-    auto resultPattern = CaseZPattern(caseBits, builder.getContext());
+    auto resultPattern = CasePattern(caseBits, builder.getContext());
     casePatterns.push_back(resultPattern.attr);
     caseBits.clear();
 
@@ -713,10 +722,15 @@ ParseResult CaseZOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-void CaseZOp::print(OpAsmPrinter &p) {
-  p << ' ' << cond() << " : " << cond().getType();
+void CaseOp::print(OpAsmPrinter &p) {
+  p << ' ';
+  if (caseStyle() == CaseStmtType::CaseXStmt)
+    p << "casex ";
+  else if (caseStyle() == CaseStmtType::CaseZStmt)
+    p << "casez ";
+  p << cond() << " : " << cond().getType();
   p.printOptionalAttrDict((*this)->getAttrs(),
-                          /*elidedAttrs=*/{"casePatterns"});
+                          /*elidedAttrs=*/{"casePatterns", "caseStyle"});
 
   for (auto caseInfo : getCases()) {
     p.printNewline();
@@ -736,19 +750,21 @@ void CaseZOp::print(OpAsmPrinter &p) {
   }
 }
 
-static LogicalResult verifyCaseZOp(CaseZOp op) {
+LogicalResult CaseOp::verify() {
   // Ensure that the number of regions and number of case values match.
-  if (op.casePatterns().size() != op.getNumRegions())
-    return op.emitOpError("case pattern / region count mismatch");
+  if (casePatterns().size() != getNumRegions())
+    return emitOpError("case pattern / region count mismatch");
   return success();
 }
 
 /// This ctor allows you to build a CaseZ with some number of cases, getting
 /// a callback for each case.
-void CaseZOp::build(OpBuilder &builder, OperationState &result, Value cond,
-                    size_t numCases,
-                    std::function<CaseZPattern(size_t)> caseCtor) {
+void CaseOp::build(OpBuilder &builder, OperationState &result,
+                   CaseStmtType caseStyle, Value cond, size_t numCases,
+                   std::function<CasePattern(size_t)> caseCtor) {
   result.addOperands(cond);
+  result.addAttribute("caseStyle",
+                      CaseStmtTypeAttr::get(builder.getContext(), caseStyle));
   SmallVector<Attribute> casePatterns;
 
   OpBuilder::InsertionGuard guard(builder);
@@ -766,17 +782,17 @@ void CaseZOp::build(OpBuilder &builder, OperationState &result, Value cond,
 // Assignment statements
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyBPAssignOp(BPAssignOp op) {
-  if (isa<sv::WireOp>(op.dest().getDefiningOp()))
-    return op.emitOpError(
+LogicalResult BPAssignOp::verify() {
+  if (isa<sv::WireOp>(dest().getDefiningOp()))
+    return emitOpError(
         "Verilog disallows procedural assignment to a net type (did you intend "
         "to use a variable type, e.g., sv.reg?)");
   return success();
 }
 
-static LogicalResult verifyPAssignOp(PAssignOp op) {
-  if (isa<sv::WireOp>(op.dest().getDefiningOp()))
-    return op.emitOpError(
+LogicalResult PAssignOp::verify() {
+  if (isa<sv::WireOp>(dest().getDefiningOp()))
+    return emitOpError(
         "Verilog disallows procedural assignment to a net type (did you intend "
         "to use a variable type, e.g., sv.reg?)");
   return success();
@@ -871,36 +887,36 @@ void InterfaceModportOp::build(OpBuilder &builder, OperationState &state,
 }
 
 /// Ensure that the symbol being instantiated exists and is an InterfaceOp.
-static LogicalResult verifyInterfaceInstanceOp(InterfaceInstanceOp op) {
-  auto symtable = SymbolTable::getNearestSymbolTable(op);
+LogicalResult InterfaceInstanceOp::verify() {
+  auto *symtable = SymbolTable::getNearestSymbolTable(*this);
   if (!symtable)
-    return op.emitError("sv.interface.instance must exist within a region "
-                        "which has a symbol table.");
-  auto ifaceTy = op.getType();
+    return emitError("sv.interface.instance must exist within a region "
+                     "which has a symbol table.");
+  auto ifaceTy = getType();
   auto referencedOp =
       SymbolTable::lookupSymbolIn(symtable, ifaceTy.getInterface());
   if (!referencedOp)
-    return op.emitError("Symbol not found: ") << ifaceTy.getInterface() << ".";
+    return emitError("Symbol not found: ") << ifaceTy.getInterface() << ".";
   if (!isa<InterfaceOp>(referencedOp))
-    return op.emitError("Symbol ")
+    return emitError("Symbol ")
            << ifaceTy.getInterface() << " is not an InterfaceOp.";
   return success();
 }
 
 /// Ensure that the symbol being instantiated exists and is an
 /// InterfaceModportOp.
-static LogicalResult verifyGetModportOp(GetModportOp op) {
-  auto symtable = SymbolTable::getNearestSymbolTable(op);
+LogicalResult GetModportOp::verify() {
+  auto *symtable = SymbolTable::getNearestSymbolTable(*this);
   if (!symtable)
-    return op.emitError("sv.interface.instance must exist within a region "
-                        "which has a symbol table.");
-  auto ifaceTy = op.getType();
+    return emitError("sv.interface.instance must exist within a region "
+                     "which has a symbol table.");
+  auto ifaceTy = getType();
   auto referencedOp =
       SymbolTable::lookupSymbolIn(symtable, ifaceTy.getModport());
   if (!referencedOp)
-    return op.emitError("Symbol not found: ") << ifaceTy.getModport() << ".";
+    return emitError("Symbol not found: ") << ifaceTy.getModport() << ".";
   if (!isa<InterfaceModportOp>(referencedOp))
-    return op.emitError("Symbol ")
+    return emitError("Symbol ")
            << ifaceTy.getModport() << " is not an InterfaceModportOp.";
   return success();
 }
@@ -993,6 +1009,14 @@ InterfaceInstanceOp::getReferencedInterface(const hw::SymbolCache *cache) {
   return topLevelModuleOp.lookupSymbol(interface);
 }
 
+LogicalResult AssignInterfaceSignalOp::verify() {
+  return verifySignalExists(iface(), signalNameAttr());
+}
+
+LogicalResult ReadInterfaceSignalOp::verify() {
+  return verifySignalExists(iface(), signalNameAttr());
+}
+
 //===----------------------------------------------------------------------===//
 // WireOp
 //===----------------------------------------------------------------------===//
@@ -1068,9 +1092,9 @@ LogicalResult WireOp::canonicalize(WireOp wire, PatternRewriter &rewriter) {
 }
 
 /// Ensure that the symbol being instantiated exists and is an InterfaceOp.
-static LogicalResult verifyWireOp(WireOp op) {
-  if (!isa<hw::HWModuleOp>(op->getParentOp()))
-    return op.emitError("sv.wire must not be in an always or initial block");
+LogicalResult WireOp::verify() {
+  if (!isa<hw::HWModuleOp>((*this)->getParentOp()))
+    return emitError("sv.wire must not be in an always or initial block");
   return success();
 }
 
@@ -1121,6 +1145,32 @@ LogicalResult IndexedPartSelectInOutOp::inferReturnTypes(
   return success();
 }
 
+LogicalResult IndexedPartSelectInOutOp::verify() {
+  unsigned inputWidth = 0, resultWidth = 0;
+  auto opWidth = width();
+
+  if (auto i = input()
+                   .getType()
+                   .cast<InOutType>()
+                   .getElementType()
+                   .dyn_cast<IntegerType>())
+    inputWidth = i.getWidth();
+  else
+    return emitError("input element type must be Integer");
+
+  if (auto resType =
+          getType().cast<InOutType>().getElementType().dyn_cast<IntegerType>())
+    resultWidth = resType.getWidth();
+  else
+    return emitError("result element type must be Integer");
+
+  if (opWidth > inputWidth)
+    return emitError("slice width should not be greater than input width");
+  if (opWidth != resultWidth)
+    return emitError("result width must be equal to slice width");
+  return success();
+}
+
 OpFoldResult IndexedPartSelectInOutOp::fold(ArrayRef<Attribute> constants) {
   if (getType() == input().getType())
     return input();
@@ -1151,42 +1201,16 @@ LogicalResult IndexedPartSelectOp::inferReturnTypes(
   return success();
 }
 
-static LogicalResult verifyIndexedPartSelectOp(Operation *op) {
-  return TypeSwitch<Operation *, LogicalResult>(op)
-      .Case<IndexedPartSelectOp, IndexedPartSelectInOutOp>(
-          [&](auto p) -> LogicalResult {
-            unsigned inputWidth = 0, resultWidth = 0;
-            auto width = p.width();
-            if (isa<IndexedPartSelectInOutOp>(p)) {
-              if (auto i = p.input()
-                               .getType()
-                               .template cast<InOutType>()
-                               .getElementType()
-                               .template dyn_cast<IntegerType>())
-                inputWidth = i.getWidth();
-              else
-                return op->emitError("input element type must be Integer");
-              if (auto resType = p.getType()
-                                     .template cast<InOutType>()
-                                     .getElementType()
-                                     .template dyn_cast<IntegerType>())
-                resultWidth = resType.getWidth();
-              else
-                return op->emitError("result element type must be Integer");
-            } else {
-              resultWidth = p.getType().template cast<IntegerType>().getWidth();
-              inputWidth =
-                  p.input().getType().template cast<IntegerType>().getWidth();
-            }
-            if (width > inputWidth)
-              return op->emitError(
-                  "slice width should not be greater than input width");
-            if (width != resultWidth)
-              return op->emitError("result width must be equal to slice width");
-            return success();
-          })
-      .Default([&](auto) { return failure(); });
+LogicalResult IndexedPartSelectOp::verify() {
+  auto opWidth = width();
 
+  unsigned resultWidth = getType().cast<IntegerType>().getWidth();
+  unsigned inputWidth = input().getType().cast<IntegerType>().getWidth();
+
+  if (opWidth > inputWidth)
+    return emitError("slice width should not be greater than input width");
+  if (opWidth != resultWidth)
+    return emitError("result width must be equal to slice width");
   return success();
 }
 
@@ -1215,10 +1239,10 @@ LogicalResult StructFieldInOutOp::inferReturnTypes(
 // Other ops.
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyAliasOp(AliasOp op) {
+LogicalResult AliasOp::verify() {
   // Must have at least two operands.
-  if (op.operands().size() < 2)
-    return op.emitOpError("alias must have at least two operands");
+  if (operands().size() < 2)
+    return emitOpError("alias must have at least two operands");
 
   return success();
 }
@@ -1328,12 +1352,12 @@ hw::InstanceOp BindOp::getReferencedInstance(const hw::SymbolCache *cache) {
 }
 
 /// Ensure that the symbol being instantiated exists and is an InterfaceOp.
-static LogicalResult verifyBindOp(BindOp op) {
-  auto inst = op.getReferencedInstance();
+LogicalResult BindOp::verify() {
+  auto inst = getReferencedInstance();
   if (!inst)
-    return op.emitError("Referenced instance doesn't exist");
+    return emitError("Referenced instance doesn't exist");
   if (!inst->getAttr("doNotPrint"))
-    return op.emitError("Referenced instance isn't marked as doNotPrint");
+    return emitError("Referenced instance isn't marked as doNotPrint");
   return success();
 }
 
@@ -1370,12 +1394,12 @@ BindInterfaceOp::getReferencedInstance(const hw::SymbolCache *cache) {
 }
 
 /// Ensure that the symbol being instantiated exists and is an InterfaceOp.
-static LogicalResult verifyBindInterfaceOp(BindInterfaceOp op) {
-  auto inst = op.getReferencedInstance();
+LogicalResult BindInterfaceOp::verify() {
+  auto inst = getReferencedInstance();
   if (!inst)
-    return op.emitError("Referenced interface doesn't exist");
+    return emitError("Referenced interface doesn't exist");
   if (!inst->getAttr("doNotPrint"))
-    return op.emitError("Referenced interface isn't marked as doNotPrint");
+    return emitError("Referenced interface isn't marked as doNotPrint");
   return success();
 }
 

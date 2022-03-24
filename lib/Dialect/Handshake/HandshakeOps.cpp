@@ -397,9 +397,9 @@ void MuxOp::print(OpAsmPrinter &p) {
   p << " : " << selectType << ", " << dataType();
 }
 
-static LogicalResult verify(MuxOp op) {
-  unsigned numDataOperands = static_cast<int>(op.dataOperands().size());
-  auto selectType = op.selectOperand().getType();
+LogicalResult MuxOp::verify() {
+  unsigned numDataOperands = static_cast<int>(dataOperands().size());
+  auto selectType = selectOperand().getType();
 
   unsigned selectBits;
   if (auto integerType = selectType.dyn_cast<IntegerType>())
@@ -407,11 +407,11 @@ static LogicalResult verify(MuxOp op) {
   else if (selectType.isIndex())
     selectBits = IndexType::kInternalStorageBitWidth;
   else
-    return op.emitError("unsupported type for select operand: ") << selectType;
+    return emitError("unsupported type for select operand: ") << selectType;
 
   double maxDataOperands = std::pow(2, selectBits);
   if (numDataOperands > maxDataOperands)
-    return op.emitError("select bitwidth was ")
+    return emitError("select bitwidth was ")
            << selectBits << ", which can mux "
            << static_cast<int64_t>(maxDataOperands) << " operands, but found "
            << numDataOperands << " operands";
@@ -476,20 +476,20 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void ControlMergeOp::print(OpAsmPrinter &p) { sost::printOp(p, *this, false); }
 
-static ParseResult verifyFuncOp(handshake::FuncOp op) {
+LogicalResult FuncOp::verify() {
   // If this function is external there is nothing to do.
-  if (op.isExternal())
+  if (isExternal())
     return success();
 
   // Verify that the argument list of the function and the arg list of the
   // entry block line up.  The trait already verified that the number of
   // arguments is the same between the signature and the block.
-  auto fnInputTypes = op.getType().getInputs();
-  Block &entryBlock = op.front();
+  auto fnInputTypes = getArgumentTypes();
+  Block &entryBlock = front();
 
   for (unsigned i = 0, e = entryBlock.getNumArguments(); i != e; ++i)
     if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-      return op.emitOpError("type of entry block argument #")
+      return emitOpError("type of entry block argument #")
              << i << '(' << entryBlock.getArgument(i).getType()
              << ") must match the type of the corresponding argument in "
              << "function signature(" << fnInputTypes[i] << ')';
@@ -497,27 +497,28 @@ static ParseResult verifyFuncOp(handshake::FuncOp op) {
   // Verify that we have a name for each argument and result of this function.
   auto verifyPortNameAttr = [&](StringRef attrName,
                                 unsigned numIOs) -> LogicalResult {
-    auto portNamesAttr = op->getAttrOfType<ArrayAttr>(attrName);
+    auto portNamesAttr = (*this)->getAttrOfType<ArrayAttr>(attrName);
 
     if (!portNamesAttr)
-      return op.emitOpError() << "expected attribute '" << attrName << "'.";
+      return emitOpError() << "expected attribute '" << attrName << "'.";
 
     auto portNames = portNamesAttr.getValue();
     if (portNames.size() != numIOs)
-      return op.emitOpError()
-             << "attribute '" << attrName << "' has " << portNames.size()
-             << " entries but is expected to have " << numIOs << ".";
+      return emitOpError() << "attribute '" << attrName << "' has "
+                           << portNames.size()
+                           << " entries but is expected to have " << numIOs
+                           << ".";
 
     if (llvm::any_of(portNames,
                      [&](Attribute attr) { return !attr.isa<StringAttr>(); }))
-      return op.emitOpError() << "expected all entries in attribute '"
-                              << attrName << "' to be strings.";
+      return emitOpError() << "expected all entries in attribute '" << attrName
+                           << "' to be strings.";
 
     return success();
   };
-  if (failed(verifyPortNameAttr("argNames", op.getNumArguments())))
+  if (failed(verifyPortNameAttr("argNames", getNumArguments())))
     return failure();
-  if (failed(verifyPortNameAttr("resNames", op.getNumResults())))
+  if (failed(verifyPortNameAttr("resNames", getNumResults())))
     return failure();
 
   return success();
@@ -600,13 +601,12 @@ static void addStringToStringArrayAttr(Builder &builder, Operation *op,
 }
 
 void handshake::FuncOp::resolveArgAndResNames() {
-  auto type = getType();
   Builder builder(getContext());
 
   /// Generate a set of fallback names. These are used in case names are
   /// missing from the currently set arg- and res name attributes.
-  auto fallbackArgNames = getFuncOpNames(builder, type.getInputs(), "in");
-  auto fallbackResNames = getFuncOpNames(builder, type.getResults(), "out");
+  auto fallbackArgNames = getFuncOpNames(builder, getArgumentTypes(), "in");
+  auto fallbackResNames = getFuncOpNames(builder, getResultTypes(), "out");
   auto argNames = getArgNames().getValue();
   auto resNames = getResNames().getValue();
 
@@ -665,10 +665,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void FuncOp::print(OpAsmPrinter &p) {
-  FunctionType fnType = getType();
-  mlir::function_interface_impl::printFunctionOp(p, *this, fnType.getInputs(),
-                                                 /*isVariadic=*/true,
-                                                 fnType.getResults());
+  mlir::function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/true);
 }
 
 namespace {
@@ -959,10 +956,10 @@ void SourceOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), {"size", "dataType", "control"});
 }
 
-static ParseResult verifyConstantOp(handshake::ConstantOp op) {
+LogicalResult ConstantOp::verify() {
   // Verify that the type of the provided value is equal to the result type.
-  if (op->getAttr("value").getType() != op.getResult().getType())
-    return op.emitOpError()
+  if ((*this)->getAttr("value").getType() != getResult().getType())
+    return emitOpError()
            << "constant value type differs from operation result type.";
 
   return success();
@@ -989,18 +986,18 @@ void handshake::TerminatorOp::build(OpBuilder &builder, OperationState &result,
   result.addSuccessors(successors);
 }
 
-static ParseResult verifyBufferOp(handshake::BufferOp op) {
+LogicalResult BufferOp::verify() {
   // Verify that exactly 'size' number of initial values have been provided, if
   // an initializer list have been provided.
-  if (op.initValues().hasValue()) {
-    if (!op.isSequential())
-      return op.emitOpError()
+  if (initValues().hasValue()) {
+    if (!isSequential())
+      return emitOpError()
              << "only bufferType buffers are allowed to have initial values.";
 
-    auto nInits = op.initValues().getValue().size();
-    if (nInits != op.size())
-      return op.emitOpError() << "expected " << op.size()
-                              << " init values but got " << nInits << ".";
+    auto nInits = initValues().getValue().size();
+    if (nInits != size())
+      return emitOpError() << "expected " << size() << " init values but got "
+                           << nInits << ".";
   }
 
   return success();
@@ -1108,72 +1105,72 @@ std::string handshake::MemoryOp::getResultName(unsigned int idx) {
   return getMemoryResultName(ldCount(), stCount(), idx);
 }
 
-static LogicalResult verifyMemoryOp(handshake::MemoryOp op) {
-  auto memrefType = op.memRefType();
+LogicalResult MemoryOp::verify() {
+  auto memrefType = memRefType();
 
   if (memrefType.getNumDynamicDims() != 0)
-    return op.emitOpError()
+    return emitOpError()
            << "memref dimensions for handshake.memory must be static.";
   if (memrefType.getShape().size() != 1)
-    return op.emitOpError() << "memref must have only a single dimension.";
+    return emitOpError() << "memref must have only a single dimension.";
 
-  unsigned stCount = op.stCount();
-  unsigned ldCount = op.ldCount();
+  unsigned opStCount = stCount();
+  unsigned opLdCount = ldCount();
   int addressCount = memrefType.getShape().size();
 
-  auto inputType = op.inputs().getType();
-  auto outputType = op.outputs().getType();
+  auto inputType = inputs().getType();
+  auto outputType = outputs().getType();
   Type dataType = memrefType.getElementType();
 
-  unsigned numOperands = static_cast<int>(op.inputs().size());
-  unsigned numResults = static_cast<int>(op.outputs().size());
-  if (numOperands != (1 + addressCount) * stCount + addressCount * ldCount)
-    return op.emitOpError("number of operands ")
+  unsigned numOperands = static_cast<int>(inputs().size());
+  unsigned numResults = static_cast<int>(outputs().size());
+  if (numOperands != (1 + addressCount) * opStCount + addressCount * opLdCount)
+    return emitOpError("number of operands ")
            << numOperands << " does not match number expected of "
-           << 2 * stCount + ldCount << " with " << addressCount
+           << 2 * opStCount + opLdCount << " with " << addressCount
            << " address inputs per port";
 
-  if (numResults != stCount + 2 * ldCount)
-    return op.emitOpError("number of results ")
+  if (numResults != opStCount + 2 * opLdCount)
+    return emitOpError("number of results ")
            << numResults << " does not match number expected of "
-           << stCount + 2 * ldCount << " with " << addressCount
+           << opStCount + 2 * opLdCount << " with " << addressCount
            << " address inputs per port";
 
-  Type addressType = stCount > 0 ? inputType[1] : inputType[0];
+  Type addressType = opStCount > 0 ? inputType[1] : inputType[0];
 
-  for (unsigned i = 0; i < stCount; i++) {
+  for (unsigned i = 0; i < opStCount; i++) {
     if (inputType[2 * i] != dataType)
-      return op.emitOpError("data type for store port ")
+      return emitOpError("data type for store port ")
              << i << ":" << inputType[2 * i] << " doesn't match memory type "
              << dataType;
     if (inputType[2 * i + 1] != addressType)
-      return op.emitOpError("address type for store port ")
+      return emitOpError("address type for store port ")
              << i << ":" << inputType[2 * i + 1]
              << " doesn't match address type " << addressType;
   }
-  for (unsigned i = 0; i < ldCount; i++) {
-    Type ldAddressType = inputType[2 * stCount + i];
+  for (unsigned i = 0; i < opLdCount; i++) {
+    Type ldAddressType = inputType[2 * opStCount + i];
     if (ldAddressType != addressType)
-      return op.emitOpError("address type for load port ")
+      return emitOpError("address type for load port ")
              << i << ":" << ldAddressType << " doesn't match address type "
              << addressType;
   }
-  for (unsigned i = 0; i < ldCount; i++) {
+  for (unsigned i = 0; i < opLdCount; i++) {
     if (outputType[i] != dataType)
-      return op.emitOpError("data type for load port ")
+      return emitOpError("data type for load port ")
              << i << ":" << outputType[i] << " doesn't match memory type "
              << dataType;
   }
-  for (unsigned i = 0; i < stCount; i++) {
-    Type syncType = outputType[ldCount + i];
+  for (unsigned i = 0; i < opStCount; i++) {
+    Type syncType = outputType[opLdCount + i];
     if (!syncType.isa<NoneType>())
-      return op.emitOpError("data type for sync port for store port ")
+      return emitOpError("data type for sync port for store port ")
              << i << ":" << syncType << " is not 'none'";
   }
-  for (unsigned i = 0; i < ldCount; i++) {
-    Type syncType = outputType[ldCount + stCount + i];
+  for (unsigned i = 0; i < opLdCount; i++) {
+    Type syncType = outputType[opLdCount + opStCount + i];
     if (!syncType.isa<NoneType>())
-      return op.emitOpError("data type for sync port for load port ")
+      return emitOpError("data type for sync port for load port ")
              << i << ":" << syncType << " is not 'none'";
   }
 
@@ -1382,9 +1379,7 @@ static LogicalResult verifyMemoryAccessOp(TMemoryOp op) {
   return success();
 }
 
-static LogicalResult verifyLoadOp(handshake::LoadOp op) {
-  return verifyMemoryAccessOp(op);
-}
+LogicalResult LoadOp::verify() { return verifyMemoryAccessOp(*this); }
 
 std::string handshake::StoreOp::getResultName(unsigned int idx) {
   std::string resName;
@@ -1411,9 +1406,7 @@ void handshake::StoreOp::build(OpBuilder &builder, OperationState &result,
   result.types.append(indices.size(), builder.getIndexType());
 }
 
-static LogicalResult verifyStoreOp(handshake::StoreOp op) {
-  return verifyMemoryAccessOp(op);
-}
+LogicalResult StoreOp::verify() { return verifyMemoryAccessOp(*this); }
 
 ParseResult StoreOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseMemoryAccessOp(parser, result);
@@ -1450,12 +1443,12 @@ ParseResult JoinOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void JoinOp::print(OpAsmPrinter &p) { sost::printOp(p, *this, false); }
 
-static LogicalResult verifyInstanceOp(handshake::InstanceOp op) {
-  if (op->getNumOperands() == 0)
-    return op.emitOpError() << "must provide at least a control operand.";
+LogicalResult InstanceOp::verify() {
+  if ((*this)->getNumOperands() == 0)
+    return emitOpError() << "must provide at least a control operand.";
 
-  if (!op.getControl().getType().dyn_cast<NoneType>())
-    return op.emitOpError()
+  if (!getControl().getType().dyn_cast<NoneType>())
+    return emitOpError()
            << "last operand must be a control (none-typed) operand.";
 
   return success();
@@ -1465,25 +1458,25 @@ static LogicalResult verifyInstanceOp(handshake::InstanceOp op) {
 // TableGen'd op method definitions
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verify(handshake::ReturnOp op) {
-  auto *parent = op->getParentOp();
+LogicalResult ReturnOp::verify() {
+  auto *parent = (*this)->getParentOp();
   auto function = dyn_cast<handshake::FuncOp>(parent);
   if (!function)
-    return op.emitOpError("must have a handshake.func parent");
+    return emitOpError("must have a handshake.func parent");
 
   // The operand number and types must match the function signature.
-  const auto &results = function.getType().getResults();
-  if (op.getNumOperands() != results.size())
-    return op.emitOpError("has ")
-           << op.getNumOperands()
-           << " operands, but enclosing function returns " << results.size();
+  const auto &results = function.getResultTypes();
+  if (getNumOperands() != results.size())
+    return emitOpError("has ")
+           << getNumOperands() << " operands, but enclosing function returns "
+           << results.size();
 
   for (unsigned i = 0, e = results.size(); i != e; ++i)
-    if (op.getOperand(i).getType() != results[i])
-      return op.emitError()
-             << "type of return operand " << i << " ("
-             << op.getOperand(i).getType()
-             << ") doesn't match function result type (" << results[i] << ")";
+    if (getOperand(i).getType() != results[i])
+      return emitError() << "type of return operand " << i << " ("
+                         << getOperand(i).getType()
+                         << ") doesn't match function result type ("
+                         << results[i] << ")";
 
   return success();
 }

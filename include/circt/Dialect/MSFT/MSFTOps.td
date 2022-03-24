@@ -127,23 +127,24 @@ def MSFTModuleOp : MSFTOp<"module",
                                   mlir::OpAsmSetValueNameFn setNameFn);
 
     /// Returns the type of this function.
-    FunctionType getType() { 
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getFunctionTypeAttr().getValue().cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Verify the type attribute of this function. Returns failure and emits
     /// an error if the attribute is invalid.
     LogicalResult verifyType() {
-      auto type = getTypeAttr().getValue();
+      auto type = getFunctionTypeAttr().getValue();
       if (!type.isa<FunctionType>())
-        return emitOpError("requires '" + getTypeAttrName() +
-                           "' attribute of function type");
+        return emitOpError(
+            "requires '" + mlir::function_interface_impl::getTypeAttrName() +
+            "' attribute of function type");
       return success();
     }
   }];
@@ -173,7 +174,7 @@ def MSFTModuleExternOp : MSFTOp<"module.extern",
   ];
 
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     /// Decode information about the input and output ports on this module.
@@ -250,7 +251,7 @@ def PDPhysLocationOp : MSFTOp<"pd.location",
   }];
 }
 
-def PDPhysRegionOp : MSFTOp<"pd.physregion", 
+def PDPhysRegionOp : MSFTOp<"pd.physregion",
       [DeclareOpInterfaceMethods<DynInstDataOpInterface>]> {
   let summary = "Specify a physical region for an instance";
   let description = [{

@@ -46,20 +46,19 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     // to match the signature of the function.
     Block *addEntryBlock();
 
-    FunctionType getType() {
-      return (*this)->getAttrOfType<TypeAttr>(getTypeAttrName())
-          .getValue()
-          .cast<FunctionType>();
+    /// Returns the type of this function.
+    FunctionType getFunctionType() {
+      return getFunctionTypeAttr().getValue().cast<FunctionType>();
     }
 
     /// Implement RegionKindInterface.
     static RegionKind getRegionKind(unsigned index) { return RegionKind::Graph; }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Returns the names of the arguments to this function.
     ArrayAttr getArgNames() {
@@ -91,10 +90,11 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     /// getType, getNumFuncArguments, and getNumFuncResults can be called
     /// safely.
     LogicalResult verifyType() {
-      auto type = getTypeAttr().getValue();
+      auto type = getFunctionTypeAttr().getValue();
       if (!type.isa<FunctionType>())
-        return emitOpError("requires '" + getTypeAttrName() +
-                           "' attribute of function type");
+        return emitOpError(
+            "requires '" + mlir::function_interface_impl::getTypeAttrName() +
+            "' attribute of function type");
       return success();
     }
 
@@ -107,7 +107,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     }
   }];
 
-  let verifier = [{ return ::verify$cppClass(*this); }];
+  let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -135,7 +135,7 @@ def InstanceOp : Handshake_Op<"instance", [CallOpInterface]> {
     (ins "FuncOp":$module, CArg<"ValueRange", "{}">:$operands), [{
       $_state.addOperands(operands);
       $_state.addAttribute("module", SymbolRefAttr::get(module));
-      $_state.addTypes(module.getType().getResults());
+      $_state.addTypes(module.getResultTypes());
       $_state.addTypes({$_builder.getType<::mlir::NoneType>()});
   }]>, OpBuilder<
     (ins "SymbolRefAttr":$module, "TypeRange":$results,
@@ -179,7 +179,7 @@ def InstanceOp : Handshake_Op<"instance", [CallOpInterface]> {
     $module `(` $operands `)` attr-dict `:` functional-type($operands, results)
   }];
 
-  let verifier = [{ return ::verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -200,7 +200,7 @@ def ReturnOp : Handshake_Op<"return", [Terminator]> {
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<(ins "ArrayRef<Value>":$operands)>];
 
-  let verifier = "return ::verify(*this);";
+  let hasVerifier = 1;
   let assemblyFormat = [{ operands attr-dict `:` qualified(type(operands)) }];
 }
 
@@ -259,7 +259,7 @@ def BufferOp : Handshake_Op<"buffer", [NoSideEffect, HasClock,
 
   }];
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -381,7 +381,7 @@ def MuxOp : Handshake_Op<"mux", [
     // Use this builder for any other use case.
     OpBuilder<(ins "Value":$selectOperand, "ValueRange":$inputs)>];
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify(*this);";
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -598,7 +598,7 @@ def ConstantOp : Handshake_Op<"constant", [
     Attribute getValue() { return (*this)->getAttr("value"); }
   }];
   let assemblyFormat = [{ $ctrl attr-dict `:` qualified(type($result))}];
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def EndOp
@@ -679,7 +679,7 @@ def MemoryOp : Handshake_Op<"memory", [
       "int":$id, "Value":$memref)>
   ];
   let assemblyFormat = "`[` `ld` `=` $ldCount `,` `st` `=`  $stCount `]` `(` $inputs `)` attr-dict `:` $memRefType `,` functional-type($inputs, $outputs)";
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def ExternalMemoryOp : Handshake_Op<"extmemory", [
@@ -749,7 +749,7 @@ def LoadOp : Handshake_Op<"load", [
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<(ins "Value":$memref, "ArrayRef<Value>":$indices)>];
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def StoreOp : Handshake_Op<"store", [
@@ -782,7 +782,7 @@ def StoreOp : Handshake_Op<"store", [
   let builders =
       [OpBuilder<(ins "Value":$valueToStore, "ArrayRef<Value>":$indices)>];
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 }
 
 def JoinOp : Handshake_Op<"join", [

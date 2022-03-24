@@ -189,7 +189,7 @@ def AlwaysOp : SVOp<"always", [SingleBlock, NoTerminator, NoRegionArguments,
   }];
 
   // Check that we have the same number of events and conditions.
-  let verifier = "return ::verifyAlwaysOp(*this);";
+  let hasVerifier = 1;
 }
 
 def AlwaysCombOp : SVOp<"alwayscomb", [SingleBlock, NoTerminator,
@@ -291,26 +291,36 @@ def InitialOp : SVOp<"initial", [SingleBlock, NoTerminator, NoRegionArguments,
   }];
 }
 
-def CaseZOp : SVOp<"casez", [SingleBlock, NoTerminator, NoRegionArguments,
-                             ProceduralRegion, ProceduralOp]> {
-  let summary = "'casez (cond)' block";
-  let description = "See SystemVerilog 2017 12.5.1.";
+def CaseStmt: I32EnumAttrCase<"CaseStmt", 0, "case">;
+def CaseXStmt: I32EnumAttrCase<"CaseXStmt", 1, "casex">;
+def CaseZStmt: I32EnumAttrCase<"CaseZStmt", 2, "casez">;
+
+def CaseStmtTypeAttr : I32EnumAttr<"CaseStmtType", "case type",
+                                   [CaseStmt, CaseXStmt, CaseZStmt]>;
+
+
+def CaseOp : SVOp<"case", [SingleBlock, NoTerminator, NoRegionArguments,
+                           ProceduralRegion, ProceduralOp]> {
+  let summary = "'case (cond)' block";
+  let description = "See SystemVerilog 2017 12.5.";
 
   let regions = (region VariadicRegion<SizedRegion<1>>:$caseRegions);
-  let arguments = (ins HWIntegerType:$cond, ArrayAttr:$casePatterns);
+  let arguments = (ins DefaultValuedAttr<CaseStmtTypeAttr,
+                                         "CaseStmtType::CaseStmt">:$caseStyle,
+                       HWIntegerType:$cond, ArrayAttr:$casePatterns);
   let results = (outs);
   let hasCustomAssemblyFormat = 1;
-  let verifier = "return ::verifyCaseZOp(*this);";
+  let hasVerifier = 1;
 
   let builders = [
     /// This ctor allows you to build a CaseZ with some number of cases, getting
     /// a callback for each case.
-    OpBuilder<(ins "Value":$cond, "size_t":$numCases,
-               "std::function<CaseZPattern(size_t)>":$caseCtor)>
+    OpBuilder<(ins "CaseStmtType":$caseStyle, "Value":$cond, "size_t":$numCases,
+               "std::function<CasePattern(size_t)>":$caseCtor)>
   ];
 
   let extraClassDeclaration = [{
-    SmallVector<CaseZInfo, 4> getCases();
+    SmallVector<CaseInfo, 4> getCases();
 
     // void addCase(...)
   }];
@@ -343,7 +353,7 @@ def BPAssignOp : SVOp<"bpassign", [InOutTypeConstraint<"src", "dest">,
   let arguments = (ins InOutType:$dest, InOutElementType:$src);
   let results = (outs);
   let assemblyFormat = "$dest `,` $src  attr-dict `:` qualified(type($src))";
-  let verifier = "return ::verifyBPAssignOp(*this);";
+  let hasVerifier = 1;
 }
 
 def PAssignOp : SVOp<"passign", [InOutTypeConstraint<"src", "dest">,
@@ -358,7 +368,7 @@ def PAssignOp : SVOp<"passign", [InOutTypeConstraint<"src", "dest">,
   let arguments = (ins InOutType:$dest, InOutElementType:$src);
   let results = (outs);
   let assemblyFormat = "$dest `,` $src  attr-dict `:` qualified(type($src))";
-  let verifier = "return ::verifyPAssignOp(*this);";
+  let hasVerifier = 1;
 }
 
 
@@ -415,7 +425,7 @@ def AliasOp : SVOp<"alias"> {
   let assemblyFormat = "$operands attr-dict `:` qualified(type($operands))";
 
   // Verify that we have at least two operands.
-  let verifier = "return ::verifyAliasOp(*this);";
+  let hasVerifier = 1;
 }
 
 def FWriteOp : SVOp<"fwrite", [ProceduralOp]> {
@@ -470,7 +480,7 @@ def BindOp : SVOp<"bind", []> {
 
   let arguments = (ins InnerRefAttr:$instance);
   let results = (outs);
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 
   let assemblyFormat = "$instance attr-dict";
   let builders = [
@@ -490,7 +500,7 @@ def BindInterfaceOp : SVOp<"bind.interface", []> {
   }];
   let arguments = (ins InnerRefAttr:$instance);
   let results = (outs);
-  let verifier = "return ::verify$cppClass(*this);";
+  let hasVerifier = 1;
 
   let assemblyFormat = "$instance attr-dict";
   let extraClassDeclaration = [{
