@@ -22,7 +22,7 @@
 using namespace circt;
 using namespace chalk;
 
-using CellOpList = std::vector<Operation *>;
+using CellOpList = SmallVector<Operation *>;
 
 //===----------------------------------------------------------------------===//
 // Pass Infrastructure
