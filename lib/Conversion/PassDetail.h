@@ -47,6 +47,12 @@ namespace calyx {
 class CalyxDialect;
 } // namespace calyx
 
+namespace chalk {
+class CHALKDialect;
+class CellOp;
+class RectangleOp;
+} // namespace chalk
+
 namespace firrtl {
 class FIRRTLDialect;
 class FModuleOp;
