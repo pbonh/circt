@@ -265,6 +265,21 @@ def LowerFIRRTLToHW : Pass<"lower-firrtl-to-hw", "mlir::ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
+// CombToCHALK
+//===----------------------------------------------------------------------===//
+
+def CombToCHALK : Pass<"comb-to-chalk", "mlir::ModuleOp"> {
+  let summary = "Comb to CHALK";
+  let description = [{
+    Embed CHALK operations in Comb op regions.
+  }];
+  let constructor = "circt::createConvertCombToCHALKPass()";
+  let dependentDialects = ["comb::CombDialect",
+                           "hw::HWDialect",
+                           "chalk::CHALKDialect"];
+}
+
+//===----------------------------------------------------------------------===//
 // HandshakeToHW
 //===----------------------------------------------------------------------===//
 
