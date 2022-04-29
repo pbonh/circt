@@ -15,8 +15,8 @@
 
 #include "circt/Conversion/AffineToStaticLogic.h"
 #include "circt/Conversion/CalyxToHW.h"
-#include "circt/Conversion/CombToCHALK.h"
 #include "circt/Conversion/ExportVerilog.h"
+#include "circt/Conversion/FIRRTLToCHALK.h"
 #include "circt/Conversion/FIRRTLToHW.h"
 #include "circt/Conversion/HWToLLHD.h"
 #include "circt/Conversion/HandshakeToFIRRTL.h"

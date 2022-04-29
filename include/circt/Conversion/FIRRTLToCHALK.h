@@ -1,4 +1,5 @@
-//===- CombToCHALK.h - Comb to CHALK pass entry point -----------*- C++ -*-===//
+//===- FIRRTLToCHALK.h - FIRRTL to CHALK pass entry point -----------*- C++
+//-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,22 +7,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This header file defines prototypes that expose the CombToCHALK pass
+// This header file defines prototypes that expose the FIRRTLToCHALK pass
 // constructors.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CIRCT_CONVERSION_COMBTOCHALK_H
-#define CIRCT_CONVERSION_COMBTOCHALK_H
+#ifndef CIRCT_CONVERSION_FIRRTLTOCHALK_H
+#define CIRCT_CONVERSION_FIRRTLTOCHALK_H
 
 #include "circt/Support/LLVM.h"
 #include <memory>
 
 namespace circt {
 
-/// Create a Comb to CHALK conversion pass.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertCombToCHALKPass();
+/// Create a FIRRTL to CHALK conversion pass.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertFIRRTLToCHALKPass();
 
 } // namespace circt
 
-#endif // CIRCT_CONVERSION_COMBTOCHALK_H
+#endif // CIRCT_CONVERSION_FIRRTLTOCHALK_H

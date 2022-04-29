@@ -1,4 +1,5 @@
-//===- CombToCHALK.cpp - Comb To CHALK Conversion Pass --------------------===//
+//===- FIRRTLToCHALK.cpp - FIRRTL To CHALK Conversion Pass
+//--------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,14 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the main Comb to CHALK Conversion Pass Implementation.
+// This is the main FIRRTL to CHALK Conversion Pass Implementation.
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Conversion/CombToCHALK.h"
+#include "circt/Conversion/FIRRTLToCHALK.h"
 #include "../PassDetail.h"
 #include "circt/Dialect/CHALK/CHALKOps.h"
-#include "circt/Dialect/Comb/CombOps.h"
+#include "circt/Dialect/FIRRTL/FIRRTLOps.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -22,7 +23,7 @@
 
 using namespace mlir;
 using namespace circt;
-using namespace comb;
+using namespace firrtl;
 using namespace chalk;
 
 namespace {
@@ -31,10 +32,10 @@ namespace {
 // Expression Conversion
 //===----------------------------------------------------------------------===//
 
-struct AndOpConversion : public OpConversionPattern<AndOp> {
+struct AndPrimOpConversion : public OpConversionPattern<AndPrimOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
-  matchAndRewrite(AndOp op, OpAdaptor adaptor,
+  matchAndRewrite(AndPrimOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // rewriter.replaceOpWithNewOp<chalk::CellOP>(op, adaptor.getValues());
     OperationState state(op.getLoc(), StringRef(""));
@@ -54,19 +55,18 @@ struct AndOpConversion : public OpConversionPattern<AndOp> {
 static void populateLegality(ConversionTarget &target) {
   target.addLegalDialect<mlir::BuiltinDialect>();
   target.addLegalDialect<hw::HWDialect>();
-  target.addLegalDialect<comb::CombDialect>();
+  target.addLegalDialect<firrtl::FIRRTLDialect>();
   target.addLegalDialect<chalk::CHALKDialect>();
 }
 
-static void populateTypeConversion(TypeConverter &typeConverter) {
-}
+static void populateTypeConversion(TypeConverter &typeConverter) {}
 
 static void populateOpConversion(RewritePatternSet &patterns,
                                  TypeConverter &typeConverter) {
   auto *context = patterns.getContext();
   // clang-format off
   patterns.add<
-    AndOpConversion
+    AndPrimOpConversion
   >(typeConverter, context);
   // clang-format on
   mlir::populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
@@ -74,22 +74,23 @@ static void populateOpConversion(RewritePatternSet &patterns,
 }
 
 //===----------------------------------------------------------------------===//
-// Comb to CHALK Conversion Pass
+// FIRRTL to CHALK Conversion Pass
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct CombToCHALKPass : public CombToCHALKBase<CombToCHALKPass> {
+struct FIRRTLToCHALKPass : public FIRRTLToCHALKBase<FIRRTLToCHALKPass> {
   void runOnOperation() override;
 };
 } // namespace
 
-/// Create a Comb to core dialects conversion pass.
-std::unique_ptr<OperationPass<ModuleOp>> circt::createConvertCombToCHALKPass() {
-  return std::make_unique<CombToCHALKPass>();
+/// Create a FIRRTL to core dialects conversion pass.
+std::unique_ptr<OperationPass<ModuleOp>>
+circt::createConvertFIRRTLToCHALKPass() {
+  return std::make_unique<FIRRTLToCHALKPass>();
 }
 
-/// This is the main entrypoint for the Comb to CHALK conversion pass.
-void CombToCHALKPass::runOnOperation() {
+/// This is the main entrypoint for the FIRRTL to CHALK conversion pass.
+void FIRRTLToCHALKPass::runOnOperation() {
   MLIRContext &context = getContext();
   ModuleOp module = getOperation();
 
