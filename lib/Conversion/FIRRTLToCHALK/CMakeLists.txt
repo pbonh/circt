@@ -1,5 +1,5 @@
-add_circt_conversion_library(CIRCTCombToCHALK
-  CombToCHALK.cpp
+add_circt_conversion_library(CIRCTFIRRTLToCHALK
+  FIRRTLToCHALK.cpp
 
   DEPENDS
   CIRCTConversionPassIncGen
@@ -10,6 +10,6 @@ add_circt_conversion_library(CIRCTCombToCHALK
   LINK_LIBS PUBLIC
   CIRCTCHALK
   CIRCTHW
-  CIRCTComb
+  CIRCTFIRRTL
   MLIRTransforms
 )

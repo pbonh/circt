@@ -20,6 +20,7 @@
 #include "circt/Conversion/ExportChiselInterface.h"
 #include "circt/Conversion/CombToCHALK.h"
 #include "circt/Conversion/ExportVerilog.h"
+#include "circt/Conversion/FIRRTLToCHALK.h"
 #include "circt/Conversion/FIRRTLToHW.h"
 #include "circt/Conversion/FSMToSV.h"
 #include "circt/Conversion/HWArithToHW.h"

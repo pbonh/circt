@@ -14,13 +14,13 @@ target_link_libraries(circt-opt
   CIRCTCalyxToHW
   CIRCTCalyxToFSM
   CIRCTCalyxTransforms
-  CIRCTCombToCHALK
   CIRCTCHALK
   CIRCTCHALKTransforms
   CIRCTESI
   CIRCTExportChiselInterface
   CIRCTExportVerilog
   CIRCTFIRRTL
+  CIRCTFIRRTLToCHALK
   CIRCTFIRRTLToHW
   CIRCTFIRRTLTransforms
   CIRCTFSM
