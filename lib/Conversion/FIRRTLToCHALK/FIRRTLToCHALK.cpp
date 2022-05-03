@@ -11,17 +11,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "circt/Conversion/FIRRTLToCHALK.h"
 #include "../PassDetail.h"
+#include "circt/Conversion/FIRRTLToCHALK.h"
 #include "circt/Dialect/CHALK/CHALKOps.h"
 #include "circt/Dialect/FIRRTL/FIRRTLOps.h"
+#include "circt/Dialect/FIRRTL/FIRRTLTypes.h"
 #include "circt/Dialect/FIRRTL/FIRRTLVisitors.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinDialect.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Threading.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
@@ -67,7 +70,14 @@ struct FIRRTLCHALKEmbed : public FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult> 
       : circuitState(circuitState),
         builder(module.getLoc(), module.getContext()) {}
 
+  using FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult>::visitExpr;
+  using FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult>::visitDecl;
+  using FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult>::visitStmt;
+
   LogicalResult run();
+
+  LogicalResult visitUnhandledOp(Operation *op) { return failure(); }
+  LogicalResult visitInvalidOp(Operation *op) { return failure(); }
 
 private:
   FModuleOp firrtlModule;
@@ -78,6 +88,7 @@ private:
 
 LogicalResult FIRRTLCHALKEmbed::run() {
   for (auto &moduleOps : firrtlModule) {
+    auto done = succeeded(dispatchVisitor(&moduleOps));
   }
   // OperationState state(firrtlModule.getLoc(), firrtlModule->getName());
   // Region *region = state.addRegion();
