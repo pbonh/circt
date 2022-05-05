@@ -76,6 +76,8 @@ struct FIRRTLCHALKEmbed : public FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult> 
 
   LogicalResult run();
 
+  LogicalResult visitExpr(AndRPrimOp op);
+
   LogicalResult visitUnhandledOp(Operation *op) { return failure(); }
   LogicalResult visitInvalidOp(Operation *op) { return failure(); }
 
@@ -90,10 +92,22 @@ LogicalResult FIRRTLCHALKEmbed::run() {
   for (auto &moduleOps : firrtlModule) {
     auto done = succeeded(dispatchVisitor(&moduleOps));
   }
-  // OperationState state(firrtlModule.getLoc(), firrtlModule->getName());
-  // Region *region = state.addRegion();
-  // Block *body = new Block();
-  // region->push_back(body);
+  return success();
+}
+
+LogicalResult FIRRTLCHALKEmbed::visitExpr(AndRPrimOp op) {
+  auto firrtlAndLoc = op.getLoc();
+  auto firrtlAndName = op->getName();
+  OperationState state(firrtlAndLoc, firrtlAndName);
+  Region *region = state.addRegion();
+  OpBuilder builder(region);
+  auto *body = new Block();
+  region->push_back(body);
+  // auto builder = ImplicitLocOpBuilder::atBlockEnd(firrtlAndLoc, body);
+  // auto *andCell = CellOp::build(state, builder, StringRef(op->getName()));
+  auto andCell = builder.create<CellOp, StringRef>(firrtlAndLoc, firrtlAndName.getStringRef());
+  body->push_back(andCell);
+
   return success();
 }
 
