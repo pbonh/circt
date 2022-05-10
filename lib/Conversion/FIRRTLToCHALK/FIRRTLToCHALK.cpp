@@ -509,6 +509,9 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
 
   // We are done with our cursor op.
   cursor.erase();
+
+  // Lower all of the other operations.
+  return lowerModuleOperations(newModule, loweringState);
 }
 
 LogicalResult FIRRTLToCHALKPass::lowerModuleOperations(
