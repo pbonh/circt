@@ -1,12 +1,12 @@
-// RUN: circt-opt -firrtl-to-chalk %s | FileCheck %s --dump-input=fail
+// RUN: circt-opt -firrtl-to-chalk -debug %s | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: circuit Foo :
 firrtl.circuit "Foo" {
   // CHECK-LABEL: module Foo :
-  firrtl.module @Foo() {}
+  firrtl.module @Foo(in %ui1: !firrtl.uint<1>, out %someOut: !firrtl.uint<1>) {
+    // CHECK: someOut <- ui1
+    firrtl.connect %someOut, %ui1 : !firrtl.uint<1>, !firrtl.uint<1>
 
-  // CHECK-LABEL: module Statements :
-  firrtl.module @Statements() {
     // CHECK-LABEL: %firrtl_const = firrtl.constant 42 : !firrtl.uint
     // CHECK-LABEL: %x = firrtl.node %firrtl_const : !firrtl.uint
     // CHECK-LABEL: %y = firrtl.node %firrtl_const : !firrtl.uint
