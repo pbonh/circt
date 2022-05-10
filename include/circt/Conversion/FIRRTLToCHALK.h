@@ -21,7 +21,7 @@
 namespace circt {
 
 /// Create a FIRRTL to CHALK conversion pass.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertFIRRTLToCHALKPass();
+std::unique_ptr<mlir::Pass> createConvertFIRRTLToCHALKPass();
 
 } // namespace circt
 
