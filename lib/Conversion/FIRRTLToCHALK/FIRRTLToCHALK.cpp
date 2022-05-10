@@ -477,6 +477,11 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
 
   outputOp->setOperands(outputs);
 
+  auto &oldBlockInstList = oldModule.clone().getBody()->getOperations();
+  auto &newBlockInstList = newModule.getBodyBlock()->getOperations();
+  newBlockInstList.splice(Block::iterator(cursor), oldBlockInstList,
+                          oldBlockInstList.begin(), oldBlockInstList.end());
+
   cursor.erase();
 
   return lowerModuleOperations(newModule, loweringState);
