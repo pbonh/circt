@@ -215,7 +215,7 @@ struct CircuitLoweringState;
 struct FIRRTLCHALKEmbed : public FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult> {
   FIRRTLCHALKEmbed(hw::HWModuleOp module, CircuitLoweringState &circuitState )
       : hwModule(module), circuitState(circuitState),
-        builder(module->getLoc(), module->getContext()) {}
+        embedBuilder(module->getLoc(), module->getContext()) {}
 
   using FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult>::visitExpr;
 
@@ -229,7 +229,7 @@ struct FIRRTLCHALKEmbed : public FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult> 
 private:
   hw::HWModuleOp hwModule;
   CircuitLoweringState &circuitState;
-  ImplicitLocOpBuilder builder;
+  ImplicitLocOpBuilder embedBuilder;
 };
 } // namespace
 
@@ -310,6 +310,7 @@ circt::createConvertFIRRTLToCHALKPass() {
 /// This is the main entrypoint for the FIRRTL to CHALK conversion pass.
 void FIRRTLToCHALKPass::runOnOperation() {
   auto *topLevelModule = getOperation().getBody();
+  auto *topLevelHWModule = getOperation().getBody();
 
   // Find the single firrtl.circuit in the module.
   CircuitOp circuit;
@@ -329,13 +330,11 @@ void FIRRTLToCHALKPass::runOnOperation() {
   for (auto &op : make_early_inc_range(circuitBody->getOperations())) {
     TypeSwitch<Operation *>(&op)
         .Case<FModuleOp>([&](auto module) {
-          if (module.getBody()) {
-            modulesToProcess.push_back(module);
-            auto loweredMod = lowerModule(module, topLevelModule);
-            if (!loweredMod)
-              return signalPassFailure();
-            state.oldToNewModuleMap[&op] = loweredMod;
-          }
+          modulesToProcess.push_back(module);
+          auto loweredMod = lowerModule(module, topLevelModule);
+          if (!loweredMod)
+            return signalPassFailure();
+          state.oldToNewModuleMap[&op] = loweredMod;
         })
         .Default([&](Operation *op) {
         });
@@ -348,15 +347,6 @@ void FIRRTLToCHALKPass::runOnOperation() {
 
   if (failed(result))
     return signalPassFailure();
-  // for (auto *firrtlModule : modulesToProcess) {
-  // }
-  // for (auto *firrtlModule : modulesToProcess) {
-  //   FIRRTLCHALKEmbed(firrtlModule).run();
-  // }
-  // mlir::parallelForEachN(
-  //     &getContext(), 0, modulesToProcess.size(), [&](auto index) {
-  //       FIRRTLCHALKEmbed(modulesToProcess[index]).run();
-  // });
 }
 
 hw::HWModuleOp
@@ -444,32 +434,23 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
   size_t firrtlArg = 0;
   SmallVector<Value, 4> outputs;
 
-  // This is the terminator in the new module.
-  auto outputOp = newModule.getBodyBlock()->getTerminator();
+  auto *outputOp = newModule.getBodyBlock()->getTerminator();
   ImplicitLocOpBuilder outputBuilder(oldModule.getLoc(), outputOp);
 
   for (auto &port : ports) {
-    // Inputs and outputs are both modeled as arguments in the FIRRTL level.
     auto oldArg = oldModule.body().getArgument(firrtlArg++);
 
     bool isZeroWidth =
         port.type.cast<FIRRTLType>().getBitWidthOrSentinel() == 0;
 
     if (!port.isOutput() && !isZeroWidth) {
-      // Inputs and InOuts are modeled as arguments in the result, so we can
-      // just map them over.  We model zero bit outputs as inouts.
       Value newArg = newModule.body().getArgument(nextNewArg++);
 
-      // Cast the argument to the old type, reintroducing sign information in
-      // the hw.module body.
       newArg = castToFIRRTLType(newArg, oldArg.getType(), bodyBuilder);
-      // Switch all uses of the old operands to the new ones.
       oldArg.replaceAllUsesWith(newArg);
       continue;
     }
 
-    // We lower zero width inout and outputs to a wire that isn't connected to
-    // anything outside the module.  Inputs are lowered to zero.
     if (isZeroWidth && port.isInput()) {
       Value newArg = bodyBuilder.create<WireOp>(
           port.type, "." + port.getName().str() + ".0width_input");
@@ -478,21 +459,15 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
     }
 
     if (auto value = tryEliminatingConnectsToValue(oldArg, outputOp)) {
-      // If we were able to find the value being connected to the output,
-      // directly use it!
       outputs.push_back(value);
       assert(oldArg.use_empty() && "should have removed all uses of oldArg");
       continue;
     }
 
-    // Outputs need a temporary wire so they can be connect'd to, which we
-    // then return.
     Value newArg = bodyBuilder.create<WireOp>(
         port.type, "." + port.getName().str() + ".output");
-    // Switch all uses of the old operands to the new ones.
     oldArg.replaceAllUsesWith(newArg);
 
-    // Don't output zero bit results or inouts.
     auto resultHWType = lowerType(port.type);
     if (!resultHWType.isInteger(0)) {
       auto output = castFromFIRRTLType(newArg, resultHWType, outputBuilder);
@@ -502,15 +477,8 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
 
   outputOp->setOperands(outputs);
 
-  auto &oldBlockInstList = oldModule.getBody()->getOperations();
-  auto &newBlockInstList = newModule.getBodyBlock()->getOperations();
-  newBlockInstList.splice(Block::iterator(cursor), oldBlockInstList,
-                          oldBlockInstList.begin(), oldBlockInstList.end());
-
-  // We are done with our cursor op.
   cursor.erase();
 
-  // Lower all of the other operations.
   return lowerModuleOperations(newModule, loweringState);
 }
 
