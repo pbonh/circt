@@ -20,8 +20,8 @@
 
 namespace circt {
 
-/// Create a FIRRTL to CHALK conversion pass.
-std::unique_ptr<mlir::Pass> createConvertFIRRTLToCHALKPass();
+std::unique_ptr<mlir::Pass> createConvertFIRRTLToCHALKEmbedPass();
+std::unique_ptr<mlir::Pass> createConvertFIRRTLToCHALKParallelPass();
 
 } // namespace circt
 

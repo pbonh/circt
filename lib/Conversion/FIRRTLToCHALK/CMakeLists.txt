@@ -1,5 +1,6 @@
 add_circt_conversion_library(CIRCTFIRRTLToCHALK
-  FIRRTLToCHALK.cpp
+  FIRRTLToCHALKParallel.cpp
+  FIRRTLToCHALKEmbed.cpp
 
   DEPENDS
   CIRCTConversionPassIncGen

@@ -1,4 +1,4 @@
-// RUN: circt-opt %s -debug -firrtl-to-chalk | FileCheck %s --dump-input=fail --dump-input-context=10
+// RUN: circt-opt %s -debug -firrtl-to-chalk-parallel | FileCheck %s --dump-input=fail --dump-input-context=10
 
 // CHECK-LABEL: firrtl.circuit "Foo" {
 firrtl.circuit "Foo" {
