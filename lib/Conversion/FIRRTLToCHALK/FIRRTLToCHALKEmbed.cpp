@@ -46,83 +46,60 @@ using namespace chalk;
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct CircuitLoweringState;
-struct FIRRTLCHALKEmbed : public FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult> {
-  FIRRTLCHALKEmbed(hw::HWModuleOp module, CircuitLoweringState &circuitState, Location loc)
-      : hwModule(module), circuitState(circuitState),
-        embedBuilder(loc, module->getContext()) {}
-        // embedBuilder(ImplicitLocOpBuilder::atBlockBegin(loc, module->getBlock())) {}
+struct FIRRTLAndEmbed : public OpConversionPattern<AndPrimOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
 
-  using FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult>::visitExpr;
+  LogicalResult
+  matchAndRewrite(AndPrimOp andOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto andLoc = andOp.getLoc();
+    SmallString<32> firrtlAndOutNameStr;
+    llvm::raw_svector_ostream tmpFIRRTLStream(firrtlAndOutNameStr);
+    andOp.result().print(tmpFIRRTLStream);
+    auto firrtlAndName = tmpFIRRTLStream.str();
 
-  LogicalResult run();
+    auto newAndOp = andOp.clone();
+    auto andCell = rewriter.create<CellOp>(andLoc, firrtlAndName);
+    auto andCellLoc = andCell.getLoc();
 
-  LogicalResult visitExpr(AndPrimOp op);
+    OperationState state(andCellLoc, firrtlAndName);
+    auto *region = state.addRegion();
+    region->emplaceBlock();
+    // OpBuilder builder(region);
+    // builder.createBlock(region);
 
-  LogicalResult visitUnhandledOp(Operation *op) { return failure(); }
-  LogicalResult visitInvalidOp(Operation *op) { return failure(); }
+    // auto svReg = rewriter.create<sv::RegOp>(loc, reg.getResult().getType(),
+    //                                         reg.nameAttr());
+    // svReg->setDialectAttrs(reg->getDialectAttrs());
 
-private:
-  hw::HWModuleOp hwModule;
-  CircuitLoweringState &circuitState;
-  ImplicitLocOpBuilder embedBuilder;
-};
-} // namespace
+    // // If the seq::CompRegOp has an inner_sym attribute, set this for the
+    // // sv::RegOp inner_sym attribute.
+    // if (andOp.sym_name().hasValue())
+    //   svReg.inner_symAttr(andOp.sym_nameAttr());
 
-LogicalResult FIRRTLCHALKEmbed::run() {
-  auto &hwModuleBody = hwModule.getBody();
-  auto &hwModuleBodyBegin = hwModuleBody.front();
-  hwModuleBodyBegin.recomputeOpOrder();
-  for (auto &op : hwModuleBodyBegin.getOperations()) {
-    SmallString<32> resultNameStr;
-    llvm::raw_svector_ostream tmpStream(resultNameStr);
-    op.getLoc()->print(tmpStream);
-    LLVM_DEBUG(llvm::dbgs() << "===----- Iterate HW Module, Op Module Loc: " << tmpStream.str().data() << "-----===" << "\n");
+    // auto regVal = rewriter.create<sv::ReadInOutOp>(loc, svReg);
+    // if (andOp.reset() && andOp.resetValue()) {
+    //   rewriter.create<sv::AlwaysFFOp>(
+    //       loc, sv::EventControl::AtPosEdge, andOp.clk(), ResetType::SyncReset,
+    //       sv::EventControl::AtPosEdge, andOp.reset(),
+    //       [&]() { rewriter.create<sv::PAssignOp>(loc, svReg, andOp.input()); },
+    //       [&]() {
+    //         rewriter.create<sv::PAssignOp>(loc, svReg, andOp.resetValue());
+    //       });
+    // } else {
+    //   rewriter.create<sv::AlwaysFFOp>(
+    //       loc, sv::EventControl::AtPosEdge, andOp.clk(),
+    //       [&]() { rewriter.create<sv::PAssignOp>(loc, svReg, andOp.input()); });
+    // }
 
-    // embedBuilder.setInsertionPoint(&op);
-    // embedBuilder.setLoc(op.getLoc());
-    succeeded(dispatchVisitor(&op));
+    rewriter.replaceOp(andOp, {newAndOp});
+    return success();
   }
-  return success();
-}
+};
 
-LogicalResult FIRRTLCHALKEmbed::visitExpr(AndPrimOp op) {
-  LLVM_DEBUG(llvm::dbgs() << "===----- Visiting AndPrimOp -----===" << "\n");
-  SmallString<32> firrtlAndOutNameStr;
-  llvm::raw_svector_ostream tmpFIRRTLStream(firrtlAndOutNameStr);
-  op.result().print(tmpFIRRTLStream);
-
-  LLVM_DEBUG(llvm::dbgs() << "===----- Building CellOp for AndPrimOp -----===" << "\n");
-  auto andCell = embedBuilder.create<CellOp, StringRef>(tmpFIRRTLStream.str());
-  auto andLoc = andCell.getLoc();
-  SmallString<32> locNameStr;
-  llvm::raw_svector_ostream tmpStream(locNameStr);
-  andLoc->print(tmpStream);
-  LLVM_DEBUG(llvm::dbgs() << "===----- Building CellOp for AndPrimOp Loc: " << tmpStream.str().data() << "-----===" << "\n");
-
-  // OperationState state(andLoc, firrtlAndName);
-  // Region *region = state.addRegion();
-  // OpBuilder builder(region);
-  // auto *body = new Block();
-  // // body->push_back(andCell);
-  // region->push_back(body);
-
-  return success();
-}
-
-namespace {
 struct FIRRTLToCHALKEmbedPass : public FIRRTLToCHALKEmbedBase<FIRRTLToCHALKEmbedPass> {
   void runOnOperation() override;
-private:
-  hw::HWModuleOp lowerModule(FModuleOp oldModule, Block *topLevelBlock);
-  LogicalResult lowerPorts(ArrayRef<PortInfo> firrtlPorts,
-                           SmallVectorImpl<hw::PortInfo> &ports,
-                           Operation *moduleOp);
-  LogicalResult lowerModuleBody(FModuleOp oldModule,
-                                CircuitLoweringState &loweringState);
-  LogicalResult lowerModuleOperations(hw::HWModuleOp module,
-                                      CircuitLoweringState &loweringState,
-                                      Location loc);
 };
 } // namespace
 
@@ -132,7 +109,26 @@ circt::createConvertFIRRTLToCHALKEmbedPass() {
 }
 
 void FIRRTLToCHALKEmbedPass::runOnOperation() {
-    auto *ctx = &getContext();
-    TypeConverter typeConverter;
+  auto *topLevelModule = getOperation().getBody();
+
+  CircuitOp circuit;
+  for (auto &op : *topLevelModule) {
+    if ((circuit = dyn_cast<CircuitOp>(&op)))
+      break;
+  }
+
+  if (!circuit)
+    return;
+
+  auto &ctx = getContext();
+  TypeConverter typeConverter;
+  ConversionTarget target(ctx);
+  target.addLegalDialect<firrtl::FIRRTLDialect>();
+  target.addLegalDialect<chalk::CHALKDialect>();
+  RewritePatternSet patterns(&ctx);
+  patterns.add<FIRRTLAndEmbed>(&ctx);
+
+  if (failed(applyPartialConversion(circuit, target, std::move(patterns))))
+    signalPassFailure();
 }
 
