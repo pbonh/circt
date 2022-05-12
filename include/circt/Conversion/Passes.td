@@ -268,12 +268,22 @@ def LowerFIRRTLToHW : Pass<"lower-firrtl-to-hw", "mlir::ModuleOp"> {
 // FIRRTLToCHALK
 //===----------------------------------------------------------------------===//
 
-def FIRRTLToCHALK : Pass<"firrtl-to-chalk", "mlir::ModuleOp"> {
-  let summary = "FIRRTL to CHALK";
+def FIRRTLToCHALKEmbed : Pass<"firrtl-to-chalk-embed", "mlir::ModuleOp"> {
+  let summary = "FIRRTL to CHALK Embedding";
   let description = [{
     Embed CHALK operations in FIRRTL op regions.
   }];
-  let constructor = "circt::createConvertFIRRTLToCHALKPass()";
+  let constructor = "circt::createConvertFIRRTLToCHALKEmbedPass()";
+  let dependentDialects = ["firrtl::FIRRTLDialect",
+                           "chalk::CHALKDialect"];
+}
+
+def FIRRTLToCHALKParallel : Pass<"firrtl-to-chalk-parallel", "mlir::ModuleOp"> {
+  let summary = "Parallel FIRRTL to CHALK Operations";
+  let description = [{
+    Parallel CHALK operations in HW ModuleOp regions.
+  }];
+  let constructor = "circt::createConvertFIRRTLToCHALKParallelPass()";
   let dependentDialects = ["firrtl::FIRRTLDialect",
                            "hw::HWDialect",
                            "chalk::CHALKDialect"];
