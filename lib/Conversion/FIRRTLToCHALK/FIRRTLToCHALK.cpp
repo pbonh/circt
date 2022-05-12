@@ -213,15 +213,16 @@ static Value tryEliminatingConnectsToValue(Value flipValue,
 namespace {
 struct CircuitLoweringState;
 struct FIRRTLCHALKEmbed : public FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult> {
-  FIRRTLCHALKEmbed(hw::HWModuleOp module, CircuitLoweringState &circuitState )
+  FIRRTLCHALKEmbed(hw::HWModuleOp module, CircuitLoweringState &circuitState, Location loc)
       : hwModule(module), circuitState(circuitState),
-        embedBuilder(module->getLoc(), module->getContext()) {}
+        embedBuilder(loc, module->getContext()) {}
+        // embedBuilder(ImplicitLocOpBuilder::atBlockBegin(loc, module->getBlock())) {}
 
   using FIRRTLVisitor<FIRRTLCHALKEmbed, LogicalResult>::visitExpr;
 
   LogicalResult run();
 
-  LogicalResult visitExpr(AndRPrimOp op);
+  LogicalResult visitExpr(AndPrimOp op);
 
   LogicalResult visitUnhandledOp(Operation *op) { return failure(); }
   LogicalResult visitInvalidOp(Operation *op) { return failure(); }
@@ -234,26 +235,42 @@ private:
 } // namespace
 
 LogicalResult FIRRTLCHALKEmbed::run() {
-  auto &moduleBody = hwModule.getBody();
-  for (auto &op : moduleBody.front().getOperations()) {
+  auto &hwModuleBody = hwModule.getBody();
+  auto &hwModuleBodyBegin = hwModuleBody.front();
+  hwModuleBodyBegin.recomputeOpOrder();
+  for (auto &op : hwModuleBodyBegin.getOperations()) {
+    SmallString<32> resultNameStr;
+    llvm::raw_svector_ostream tmpStream(resultNameStr);
+    op.getLoc()->print(tmpStream);
+    LLVM_DEBUG(llvm::dbgs() << "===----- Iterate HW Module, Op Module Loc: " << tmpStream.str().data() << "-----===" << "\n");
+
+    // embedBuilder.setInsertionPoint(&op);
+    // embedBuilder.setLoc(op.getLoc());
     succeeded(dispatchVisitor(&op));
   }
   return success();
 }
 
-LogicalResult FIRRTLCHALKEmbed::visitExpr(AndRPrimOp op) {
-  LLVM_DEBUG(llvm::dbgs() << "===----- Visiting AndRPrimOp -----===" << "\n");
-  auto firrtlAndLoc = op.getLoc();
-  auto firrtlAndName = op->getName();
-  OperationState state(firrtlAndLoc, firrtlAndName);
-  Region *region = state.addRegion();
-  OpBuilder builder(region);
-  auto *body = new Block();
-  LLVM_DEBUG(llvm::dbgs() << "===----- Building CellOp for AndRPrimOp -----===" << "\n");
-  auto andCell = builder.create<CellOp, StringRef>(firrtlAndLoc, firrtlAndName.getStringRef());
-  LLVM_DEBUG(llvm::dbgs() << "===----- Adding CellOp to AndRPrimOp body -----===" << "\n");
-  body->push_back(andCell);
-  region->push_back(body);
+LogicalResult FIRRTLCHALKEmbed::visitExpr(AndPrimOp op) {
+  LLVM_DEBUG(llvm::dbgs() << "===----- Visiting AndPrimOp -----===" << "\n");
+  SmallString<32> firrtlAndOutNameStr;
+  llvm::raw_svector_ostream tmpFIRRTLStream(firrtlAndOutNameStr);
+  op.result().print(tmpFIRRTLStream);
+
+  LLVM_DEBUG(llvm::dbgs() << "===----- Building CellOp for AndPrimOp -----===" << "\n");
+  auto andCell = embedBuilder.create<CellOp, StringRef>(tmpFIRRTLStream.str());
+  auto andLoc = andCell.getLoc();
+  SmallString<32> locNameStr;
+  llvm::raw_svector_ostream tmpStream(locNameStr);
+  andLoc->print(tmpStream);
+  LLVM_DEBUG(llvm::dbgs() << "===----- Building CellOp for AndPrimOp Loc: " << tmpStream.str().data() << "-----===" << "\n");
+
+  // OperationState state(andLoc, firrtlAndName);
+  // Region *region = state.addRegion();
+  // OpBuilder builder(region);
+  // auto *body = new Block();
+  // // body->push_back(andCell);
+  // region->push_back(body);
 
   return success();
 }
@@ -261,7 +278,6 @@ LogicalResult FIRRTLCHALKEmbed::visitExpr(AndRPrimOp op) {
 namespace {
 struct FIRRTLToCHALKPass;
 
-/// This is state shared across the parallel module lowering logic.
 struct CircuitLoweringState {
   CircuitLoweringState(CircuitOp circuitOp, InstanceGraph *instanceGraph)
       : circuitOp(circuitOp), instanceGraph(instanceGraph) { }
@@ -281,38 +297,32 @@ private:
   void operator=(const CircuitLoweringState &) = delete;
 
   DenseMap<Operation *, Operation *> oldToNewModuleMap;
-
-  /// Cache of module symbols.  We need to test hirarchy-based properties to
-  /// lower annotaitons.
   InstanceGraph *instanceGraph;
 };
 
 struct FIRRTLToCHALKPass : public FIRRTLToCHALKBase<FIRRTLToCHALKPass> {
   void runOnOperation() override;
 private:
-  hw::HWModuleOp lowerModule(FModuleOp oldModule, Block *topLevelModule);
+  hw::HWModuleOp lowerModule(FModuleOp oldModule, Block *topLevelBlock);
   LogicalResult lowerPorts(ArrayRef<PortInfo> firrtlPorts,
                            SmallVectorImpl<hw::PortInfo> &ports,
                            Operation *moduleOp);
   LogicalResult lowerModuleBody(FModuleOp oldModule,
                                 CircuitLoweringState &loweringState);
   LogicalResult lowerModuleOperations(hw::HWModuleOp module,
-                                      CircuitLoweringState &loweringState);
+                                      CircuitLoweringState &loweringState,
+                                      Location loc);
 };
 } // namespace
 
-/// Create a FIRRTL to CHALK conversion(embedding) pass.
 std::unique_ptr<mlir::Pass>
 circt::createConvertFIRRTLToCHALKPass() {
   return std::make_unique<FIRRTLToCHALKPass>();
 }
 
-/// This is the main entrypoint for the FIRRTL to CHALK conversion pass.
 void FIRRTLToCHALKPass::runOnOperation() {
   auto *topLevelModule = getOperation().getBody();
-  auto *topLevelHWModule = getOperation().getBody();
 
-  // Find the single firrtl.circuit in the module.
   CircuitOp circuit;
   for (auto &op : *topLevelModule) {
     if ((circuit = dyn_cast<CircuitOp>(&op)))
@@ -323,6 +333,8 @@ void FIRRTLToCHALKPass::runOnOperation() {
     return;
 
   auto *circuitBody = circuit.getBody();
+  auto &topLevelRegion = getOperation().getBodyRegion();
+  auto &topLevelBlock = topLevelRegion.back();
   SmallVector<FModuleOp, 32> modulesToProcess;
 
   CircuitLoweringState state(circuit, &getAnalysis<InstanceGraph>());
@@ -331,7 +343,7 @@ void FIRRTLToCHALKPass::runOnOperation() {
     TypeSwitch<Operation *>(&op)
         .Case<FModuleOp>([&](auto module) {
           modulesToProcess.push_back(module);
-          auto loweredMod = lowerModule(module, topLevelModule);
+          auto loweredMod = lowerModule(module, &topLevelBlock);
           if (!loweredMod)
             return signalPassFailure();
           state.oldToNewModuleMap[&op] = loweredMod;
@@ -350,22 +362,18 @@ void FIRRTLToCHALKPass::runOnOperation() {
 }
 
 hw::HWModuleOp
-FIRRTLToCHALKPass::lowerModule(FModuleOp oldModule, Block *topLevelModule) {
+FIRRTLToCHALKPass::lowerModule(FModuleOp oldModule, Block *topLevelBlock) {
   SmallVector<PortInfo> firrtlPorts = oldModule.getPorts();
   SmallVector<hw::PortInfo, 8> ports;
   if (failed(lowerPorts(firrtlPorts, ports, oldModule)))
     return {};
 
-  // Build the new hw.module op.
-  auto builder = OpBuilder::atBlockEnd(topLevelModule);
-  auto nameAttr = builder.getStringAttr(oldModule.getName());
-  auto newModule =
-      builder.create<hw::HWModuleOp>(oldModule.getLoc(), nameAttr, ports);
+  auto hwModuleInsertLoc = topLevelBlock->back().getLoc();
+  auto builder = ImplicitLocOpBuilder::atBlockEnd(hwModuleInsertLoc, topLevelBlock);
+  auto newModule = builder.create<hw::HWModuleOp>(oldModule.getNameAttr(), ports);
 
-  // If the circuit has an entry point, set all other modules private.
-  // Otherwise, mark all modules as public.
-  SymbolTable::setSymbolVisibility(newModule,
-                                   SymbolTable::getSymbolVisibility(oldModule));
+  // SymbolTable::setSymbolVisibility(newModule,
+  //                                  SymbolTable::getSymbolVisibility(oldModule));
 
   return newModule;
 }
@@ -382,18 +390,14 @@ LogicalResult FIRRTLToCHALKPass::lowerPorts(
     hwPort.type = lowerType(firrtlPort.type);
     hwPort.sym = firrtlPort.sym;
 
-    // We can't lower all types, so make sure to cleanly reject them.
     if (!hwPort.type) {
       moduleOp->emitError("cannot lower this port type to HW");
       return failure();
     }
 
-    // If this is a zero bit port, just drop it.  It doesn't matter if it is
-    // input, output, or inout.  We don't want these at the HW level.
     if (hwPort.type.isInteger(0))
       continue;
 
-    // Figure out the direction of the port.
     if (firrtlPort.isOutput()) {
       hwPort.direction = hw::PortDirection::OUTPUT;
       hwPort.argNum = numResults++;
@@ -401,8 +405,6 @@ LogicalResult FIRRTLToCHALKPass::lowerPorts(
       hwPort.direction = hw::PortDirection::INPUT;
       hwPort.argNum = numArgs++;
     } else {
-      // If the port is an inout bundle or contains an analog type, then it is
-      // implicitly inout.
       hwPort.type = hw::InOutType::get(hwPort.type);
       hwPort.direction = hw::PortDirection::INOUT;
       hwPort.argNum = numArgs++;
@@ -417,11 +419,10 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
                                       CircuitLoweringState &loweringState) {
   auto newModule =
       dyn_cast_or_null<hw::HWModuleOp>(loweringState.getNewModule(oldModule));
-  // Don't touch modules if we failed to lower ports.
   if (!newModule)
     return success();
 
-  ImplicitLocOpBuilder bodyBuilder(oldModule.getLoc(), newModule.body());
+  ImplicitLocOpBuilder bodyBuilder(newModule.getLoc(), newModule.body());
 
   auto cursor = bodyBuilder.create<hw::ConstantOp>(APInt(1, 1));
   bodyBuilder.setInsertionPoint(cursor);
@@ -435,7 +436,7 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
   SmallVector<Value, 4> outputs;
 
   auto *outputOp = newModule.getBodyBlock()->getTerminator();
-  ImplicitLocOpBuilder outputBuilder(oldModule.getLoc(), outputOp);
+  ImplicitLocOpBuilder outputBuilder(newModule.getLoc(), outputOp);
 
   for (auto &port : ports) {
     auto oldArg = oldModule.body().getArgument(firrtlArg++);
@@ -478,16 +479,17 @@ FIRRTLToCHALKPass::lowerModuleBody(FModuleOp oldModule,
   outputOp->setOperands(outputs);
 
   auto &oldBlockInstList = oldModule.clone().getBody()->getOperations();
+  auto newModuleInsertLoc = newModule.getBodyBlock()->front().getLoc();
   auto &newBlockInstList = newModule.getBodyBlock()->getOperations();
   newBlockInstList.splice(Block::iterator(cursor), oldBlockInstList,
                           oldBlockInstList.begin(), oldBlockInstList.end());
 
   cursor.erase();
 
-  return lowerModuleOperations(newModule, loweringState);
+  return lowerModuleOperations(newModule, loweringState, newModuleInsertLoc);
 }
 
 LogicalResult FIRRTLToCHALKPass::lowerModuleOperations(
-    hw::HWModuleOp module, CircuitLoweringState &loweringState) {
-  return FIRRTLCHALKEmbed(module, loweringState).run();
+    hw::HWModuleOp module, CircuitLoweringState &loweringState, Location loc) {
+  return FIRRTLCHALKEmbed(module, loweringState, loc).run();
 }
