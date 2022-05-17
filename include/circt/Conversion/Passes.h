@@ -24,6 +24,7 @@
 #include "circt/Conversion/FIRRTLToHW.h"
 #include "circt/Conversion/FSMToSV.h"
 #include "circt/Conversion/HWArithToHW.h"
+#include "circt/Conversion/HWToCHALK.h"
 #include "circt/Conversion/HWToLLHD.h"
 #include "circt/Conversion/HWToLLVM.h"
 #include "circt/Conversion/HWToSystemC.h"
