@@ -34,6 +34,7 @@ target_link_libraries(circt-opt
   CIRCTMSFT
   CIRCTHW
   CIRCTHWToLLHD
+  CIRCTHWToCHALK
   CIRCTHWTransforms
   CIRCTSCFToCalyx
   CIRCTScheduling

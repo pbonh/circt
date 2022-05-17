@@ -18,6 +18,7 @@
 #include "circt/Conversion/ExportVerilog.h"
 #include "circt/Conversion/FIRRTLToCHALK.h"
 #include "circt/Conversion/FIRRTLToHW.h"
+#include "circt/Conversion/HWToCHALK.h"
 #include "circt/Conversion/HWToLLHD.h"
 #include "circt/Conversion/HandshakeToFIRRTL.h"
 #include "circt/Conversion/HandshakeToHW.h"
