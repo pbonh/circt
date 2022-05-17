@@ -1,4 +1,4 @@
-// RUN: circt-opt %s -debug -firrtl-to-chalk-parallel | FileCheck %s --dump-input=fail --dump-input-context=10
+// RUN: circt-opt %s -firrtl-to-chalk-parallel | FileCheck %s --dump-input=fail --dump-input-context=10
 
 // CHECK-LABEL: firrtl.circuit "Foo" {
 firrtl.circuit "Foo" {
@@ -18,7 +18,7 @@ firrtl.circuit "Foo" {
 }
 
 // CHECK-LABEL: hw.module @Foo(%ui1: i1) {
-// CHECK:  chalk.cell "1" {
-// CHECK:  chalk.rectangle "1_Rectangle" {height = 0 : ui32, width = 0 : ui32, xCoord = 0 : i64, yCoord = 0 : i64}
-// CHECK:  }
-// CHECK:  }
+// COM:  chalk.cell "1" {
+// COM:  chalk.rectangle "1_Rectangle" {height = 0 : ui32, width = 0 : ui32, xCoord = 0 : i64, yCoord = 0 : i64}
+// COM:  }
+// COM:  }
