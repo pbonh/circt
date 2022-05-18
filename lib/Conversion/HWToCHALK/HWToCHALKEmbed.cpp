@@ -37,6 +37,7 @@ using namespace mlir;
 using namespace circt;
 using namespace hw;
 using namespace chalk;
+using namespace comb;
 
 //===----------------------------------------------------------------------===//
 // HW to CHALK Conversion Pass
@@ -48,12 +49,39 @@ struct HWEmbedPatternRewriter : public PatternRewriter {
   HWEmbedPatternRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
 };
 
-struct HWOrEmbed : public RewritePattern {
-  using RewritePattern::RewritePattern;
-  HWOrEmbed(MLIRContext *ctx)
-      : RewritePattern(comb::OrOp::getOperationName(), PatternBenefit(1), ctx) {}
+struct HWCHALKEmbed : public RewritePattern {
+  // using RewritePattern::RewritePattern;
+  HWCHALKEmbed(MLIRContext *context)
+   : RewritePattern(comb::AndOp::getOperationName(), PatternBenefit(1), context) {}
 
-  LogicalResult matchAndRewrite(Operation *op,
+  // HWCHALKEmbed()
+  //  : RewritePattern(PatternBenefit(1), MatchAnyOpTypeTag()) {}
+
+  LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) {
+    if (isa<comb::AndOp>(op)) {
+      auto andOp = dyn_cast<comb::AndOp>(op);
+      LLVM_DEBUG(llvm::dbgs() << "===----- Rewriting AndPrimOp -----==="
+                              << "\n");
+      SmallString<32> firrtlAndOutNameStr;
+      llvm::raw_svector_ostream tmpFIRRTLStream(firrtlAndOutNameStr);
+      andOp.result().print(tmpFIRRTLStream);
+      auto firrtlAndName = tmpFIRRTLStream.str();
+      auto andLoc = andOp.getLoc();
+      auto andCell = rewriter.create<CellOp>(andLoc, firrtlAndName);
+      auto andCellLoc = andCell.getLoc();
+      OperationState state(andCellLoc, firrtlAndName);
+      auto *region = state.addRegion();
+      auto &andCellOpBlock = region->emplaceBlock();
+    }
+  }
+};
+
+struct HWOrEmbed : public OpRewritePattern<comb::OrOp> {
+  using OpRewritePattern::OpRewritePattern;
+  // HWOrEmbed(MLIRContext *ctx)
+  //     : OpRewritePattern<comb::OrOp>(ctx, PatternBenefit(1)) {}
+
+  LogicalResult matchAndRewrite(comb::OrOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.startRootUpdate(op);
     rewriter.finalizeRootUpdate(op);
@@ -78,16 +106,56 @@ struct HWToCHALKEmbedPass : public HWToCHALKEmbedBase<HWToCHALKEmbedPass> {
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> circt::createConvertHWToCHALKEmbedPass() {
+std::unique_ptr<Pass> circt::createConvertHWToCHALKEmbedPass() {
   return std::make_unique<HWToCHALKEmbedPass>();
 }
 
+using OpList = SmallVector<Operation *>;
+
 void HWToCHALKEmbedPass::runOnOperation() {
-  auto *ctx = &getContext();
+  MLIRContext &ctx = getContext();
+  /*
+  OpBuilder builder(&ctx);
+  OpList hwModules;
+  llvm::for_each(getOperation().getBody()->getOperations(), [&](Operation &op) {
+    if (isa<comb::AndOp>(op)) {
+      hwModules.push_back(&op);
+    }
+  });
+
+  for (auto *op : hwModules ) {
+    auto hwModulesOps = op->getBody()->getOperations();
+    for (auto *op : hwModules ) {
+      auto andOp = dyn_cast<comb::AndOp>(op);
+
+      SmallString<32> firrtlAndOutNameStr;
+      llvm::raw_svector_ostream tmpFIRRTLStream(firrtlAndOutNameStr);
+      andOp.result().print(tmpFIRRTLStream);
+      auto firrtlAndName = tmpFIRRTLStream.str();
+      auto andLoc = andOp.getLoc();
+
+      OperationState state(andLoc, firrtlAndName);
+      auto *region = state.addRegion();
+      auto &andOpBlock = region->emplaceBlock();
+
+      OpBuilder builder(&andOpBlock, andOpBlock.begin());
+      CellOp::build(builder, state, firrtlAndName);
+    }
+  }
+  */
 
   // TypeConverter typeConverter;
   // HWEmbedPatternRewriter rewriter(ctx);
-  ConversionTarget target(*ctx);
+
+  // RewritePattern::create<HWAndEmbed>(ctx);
+  // RewritePattern::create<HWOrEmbed>(ctx);
+
+  RewritePatternSet patterns(&ctx);
+  patterns.add<HWAndEmbed>(&ctx);
+  patterns.add<HWOrEmbed>(&ctx);
+  patterns.add<HWCHALKEmbed>(&ctx);
+
+  ConversionTarget target(ctx);
   target.addLegalDialect<hw::HWDialect>();
   target.addLegalDialect<comb::CombDialect>();
   target.addLegalDialect<chalk::CHALKDialect>();
@@ -95,13 +163,6 @@ void HWToCHALKEmbedPass::runOnOperation() {
   target.addLegalOp<comb::AndOp>();
   target.addLegalOp<comb::OrOp>();
   target.markOpRecursivelyLegal<CellOp, comb::AndOp, comb::OrOp>();
-
-  RewritePattern::create<HWAndEmbed>(ctx);
-  RewritePattern::create<HWOrEmbed>(ctx);
-
-  RewritePatternSet patterns(ctx);
-  patterns.addWithLabel<HWAndEmbed>({"HW Synth: AND"}, ctx);
-  patterns.addWithLabel<HWOrEmbed>({"HW Synth: OR"}, ctx);
 
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
