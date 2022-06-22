@@ -49,12 +49,20 @@ struct HWEmbedPatternRewriter : public PatternRewriter {
   HWEmbedPatternRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
 };
 
-struct HWCHALKEmbed : public RewritePattern {
+struct HWCHALKEmbedConversion : public ConversionPattern {
+  using ConversionPattern::ConversionPattern;
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+  }
+};
+
+struct HWCHALKEmbedRewrite : public RewritePattern {
   // using RewritePattern::RewritePattern;
-  HWCHALKEmbed(MLIRContext *context)
+  HWCHALKEmbedRewrite(MLIRContext *context)
    : RewritePattern(comb::AndOp::getOperationName(), PatternBenefit(1), context) {}
 
-  // HWCHALKEmbed()
+  // HWCHALKEmbedRewrite()
   //  : RewritePattern(PatternBenefit(1), MatchAnyOpTypeTag()) {}
 
   LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) {
@@ -153,7 +161,8 @@ void HWToCHALKEmbedPass::runOnOperation() {
   RewritePatternSet patterns(&ctx);
   patterns.add<HWAndEmbed>(&ctx);
   patterns.add<HWOrEmbed>(&ctx);
-  patterns.add<HWCHALKEmbed>(&ctx);
+  patterns.add<HWCHALKEmbedRewrite>(&ctx);
+  patterns.add<HWCHALKEmbedConversion>(&ctx);
 
   ConversionTarget target(ctx);
   target.addLegalDialect<hw::HWDialect>();
