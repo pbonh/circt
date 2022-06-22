@@ -27,7 +27,6 @@
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Threading.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -46,69 +45,29 @@ using namespace chalk;
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-struct FIRRTLEmbedPatternRewriter : public PatternRewriter {
-  FIRRTLEmbedPatternRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
-};
-
-struct FIRRTLOrEmbed : public RewritePattern {
-  using RewritePattern::RewritePattern;
-  FIRRTLOrEmbed(MLIRContext *ctx) : RewritePattern(OrPrimOp::getOperationName(), PatternBenefit(1), ctx) {}
-
-  LogicalResult
-  matchAndRewrite(Operation* op,
-                  PatternRewriter &rewriter) const override {
-    rewriter.startRootUpdate(op);
-    rewriter.finalizeRootUpdate(op);
-    return success();
-  }
-};
-
 struct FIRRTLAndEmbed : public OpConversionPattern<AndPrimOp> {
   using OpConversionPattern::OpConversionPattern;
+  // FIRRTLAndEmbed(MLIRContext *context)
+  //     : OpConversionPattern<AndPrimOp>(context) {}
 
-  LogicalResult
-  matchAndRewrite(AndPrimOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.startRootUpdate(op);
-    rewriter.finalizeRootUpdate(op);
-    return success();
-  }
-};
-
-/*
-struct FIRRTLAndEmbed : public OpConversionPattern<AndPrimOp> {
-  using OpConversionPattern<AndPrimOp>::OpConversionPattern;
-  FIRRTLAndEmbed(MLIRContext *context)
-      : OpConversionPattern(context) {}
-
-  // LogicalResult
-  // match(AndPrimOp andOp) const override {
-  //   return success();
-  // }
-  //
   LogicalResult
   matchAndRewrite(AndPrimOp andOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-
-    LLVM_DEBUG(llvm::dbgs() << "===----- Rewriting AndPrimOp -----==="
-                            << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "===----- Rewriting AndPrimOp -----===" << "\n");
     SmallString<32> firrtlAndOutNameStr;
     llvm::raw_svector_ostream tmpFIRRTLStream(firrtlAndOutNameStr);
     andOp.result().print(tmpFIRRTLStream);
     auto firrtlAndName = tmpFIRRTLStream.str();
     auto andLoc = andOp.getLoc();
 
-    // auto newAndOp = andOp.clone();
-    // LLVM_DEBUG(llvm::dbgs() << "===----- Create CellOp(AndPrimOp) -----==="
-    //                         << "\n");
-    // auto andCell = rewriter.create<CellOp>(andLoc, firrtlAndName);
-    // auto andCellLoc = andCell.getLoc();
+    auto newAndOp = andOp.clone();
+  LLVM_DEBUG(llvm::dbgs() << "===----- Create CellOp(AndPrimOp) -----===" << "\n");
+    auto andCell = rewriter.create<CellOp>(andLoc, firrtlAndName);
+    auto andCellLoc = andCell.getLoc();
 
-    // OperationState state(andCellLoc, firrtlAndName);
-    // auto *region = state.addRegion();
-    // region->emplaceBlock();
-
+    OperationState state(andCellLoc, firrtlAndName);
+    auto *region = state.addRegion();
+    region->emplaceBlock();
     // OpBuilder builder(region);
     // builder.createBlock(region);
 
@@ -138,28 +97,10 @@ struct FIRRTLAndEmbed : public OpConversionPattern<AndPrimOp> {
     //       });
     // }
 
-    // rewriter.replaceOp(andOp, {newAndOp});
-    // return success();
-
-    rewriter.startRootUpdate(andOp);
-
-    OperationState state(andLoc, firrtlAndName);
-    auto *region = state.addRegion();
-    auto &andOpBlock = region->emplaceBlock();
-
-    auto andCell = rewriter.create<CellOp>(andLoc, firrtlAndName);
-    auto andCellLoc = andCell.getLoc();
-    andOpBlock.push_back(andCell);
-
-    OperationState cellState(andCellLoc, firrtlAndName);
-    auto *cellRegion = cellState.addRegion();
-    auto &andCellOpBlock = cellRegion->emplaceBlock();
-
-    rewriter.finalizeRootUpdate(andOp);
+    rewriter.replaceOp(andOp, {newAndOp});
     return success();
   }
 };
-*/
 
 struct FIRRTLToCHALKEmbedPass
     : public FIRRTLToCHALKEmbedBase<FIRRTLToCHALKEmbedPass> {
@@ -172,26 +113,18 @@ std::unique_ptr<mlir::Pass> circt::createConvertFIRRTLToCHALKEmbedPass() {
 }
 
 void FIRRTLToCHALKEmbedPass::runOnOperation() {
-  auto *ctx = &getContext();
-
-  // TypeConverter typeConverter;
-  // FIRRTLEmbedPatternRewriter rewriter(ctx);
-  ConversionTarget target(*ctx);
+  auto &ctx = getContext();
+  TypeConverter typeConverter;
+  ConversionTarget target(ctx);
   target.addLegalDialect<firrtl::FIRRTLDialect>();
   target.addLegalDialect<chalk::CHALKDialect>();
   target.addLegalOp<CellOp>();
   target.addLegalOp<AndPrimOp>();
-  target.addLegalOp<OrPrimOp>();
-  target.markOpRecursivelyLegal<CellOp, AndPrimOp, OrPrimOp>();
+  target.markOpRecursivelyLegal<CellOp, AndPrimOp>();
 
-  RewritePattern::create<FIRRTLAndEmbed>(ctx);
-  RewritePattern::create<FIRRTLOrEmbed>(ctx);
+  RewritePatternSet patterns(&ctx);
+  patterns.add<FIRRTLAndEmbed>(&ctx);
 
-  RewritePatternSet patterns(ctx);
-  patterns.addWithLabel<FIRRTLAndEmbed>({"FIRRTL Synth: AND"}, ctx);
-  patterns.addWithLabel<FIRRTLOrEmbed>({"FIRRTL Synth: OR"}, ctx);
-
-  if (failed(
-          applyPartialConversion(getOperation(), target, std::move(patterns))))
+  if (failed(applyPartialConversion(getOperation(), target, std::move(patterns))))
     signalPassFailure();
 }
