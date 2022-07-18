@@ -122,6 +122,7 @@ using OpList = SmallVector<Operation *>;
 
 void HWToCHALKEmbedPass::runOnOperation() {
   MLIRContext &ctx = getContext();
+  ModuleOp module = getOperation();
   /*
   OpBuilder builder(&ctx);
   OpList hwModules;
@@ -158,22 +159,23 @@ void HWToCHALKEmbedPass::runOnOperation() {
   // RewritePattern::create<HWAndEmbed>(ctx);
   // RewritePattern::create<HWOrEmbed>(ctx);
 
-  RewritePatternSet patterns(&ctx);
-  patterns.add<HWAndEmbed>(&ctx);
-  patterns.add<HWOrEmbed>(&ctx);
-  patterns.add<HWCHALKEmbedRewrite>(&ctx);
-  // patterns.add<HWCHALKEmbedConversion>(&ctx);
-
   ConversionTarget target(ctx);
   target.addLegalDialect<hw::HWDialect>();
   target.addLegalDialect<comb::CombDialect>();
   target.addLegalDialect<chalk::CHALKDialect>();
+  target.addLegalOp<hw::HWModuleOp>();
   target.addLegalOp<CellOp>();
   target.addLegalOp<comb::AndOp>();
   target.addLegalOp<comb::OrOp>();
-  target.markOpRecursivelyLegal<CellOp, comb::AndOp, comb::OrOp>();
+  target.markOpRecursivelyLegal<hw::HWModuleOp, CellOp, comb::AndOp, comb::OrOp>();
+
+  RewritePatternSet patterns(&ctx);
+  // patterns.add<HWAndEmbed>(&ctx);
+  // patterns.add<HWOrEmbed>(&ctx);
+  patterns.add<HWCHALKEmbedRewrite>(&ctx);
+  // patterns.add<HWCHALKEmbedConversion>(&ctx);
 
   if (failed(
-          applyPartialConversion(getOperation(), target, std::move(patterns))))
+          applyPartialConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }
